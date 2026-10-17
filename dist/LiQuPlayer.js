@@ -595,6 +595,8 @@ class SourceManager {
     this.vimeoCurrentTime = 0;
     this.qualities = [];
     this.currentQualityIndex = -1; // -1 = Auto
+    this._isLoading = false;
+    this._pendingPlay = false;
   }
 
   detectSourceType(src) {
@@ -612,6 +614,8 @@ class SourceManager {
 
   async load(source) {
     this.unload();
+    this._isLoading = true;
+    this._pendingPlay = !!this.player.options.autoplay;
     this.currentSource = source;
     const url = typeof source === 'string' ? source : (source ? source.src : '');
     this.sourceType = this.detectSourceType(url);
@@ -647,6 +651,8 @@ class SourceManager {
     } catch (err) {
       console.error('[LiQuPlayer] Source load failed:', err);
       this.player.showError('Could not load media source. Please verify URL or network.');
+    } finally {
+      this._isLoading = false;
     }
   }
 
@@ -798,8 +804,11 @@ class SourceManager {
   }
 
   extractYouTubeId(url) {
+    if (!url) return null;
+    if (typeof url === 'object' && url.src) url = url.src;
+    url = url.trim();
     if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
-    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/|live\/))([\w-]{11})/i);
+    const match = url.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:embed\/|v\/|watch\?(?:.*&)?v=|shorts\/|live\/))([\w-]{11})/i);
     return match ? match[1] : null;
   }
 
@@ -823,7 +832,7 @@ class SourceManager {
     ytWrapper.innerHTML = '<div class="liqu-yt-mount"></div>';
     const mountNode = ytWrapper.querySelector('.liqu-yt-mount');
 
-    // Load YT IFrame API safely without race condition
+    // Load YT IFrame API safely with 3.5s timeout fallback
     if (typeof window.YT === 'undefined' || !window.YT.Player) {
       await new Promise(resolve => {
         if (window.YT && window.YT.Player) return resolve();
@@ -832,58 +841,77 @@ class SourceManager {
           if (typeof prev === 'function') prev();
           resolve();
         };
+        const timeout = setTimeout(() => {
+          clearInterval(poll);
+          resolve();
+        }, 3500);
         const poll = setInterval(() => {
           if (window.YT && window.YT.Player) {
+            clearTimeout(timeout);
             clearInterval(poll);
             resolve();
           }
         }, 50);
         this.loadScript('https://www.youtube.com/iframe_api').then(() => {
           if (window.YT && window.YT.Player) {
+            clearTimeout(timeout);
             clearInterval(poll);
             resolve();
           }
+        }).catch(() => {
+          clearTimeout(timeout);
+          clearInterval(poll);
+          resolve();
         });
       });
+    }
+
+    if (!window.YT || !window.YT.Player) {
+      // Fallback to direct responsive iframe embed
+      mountNode.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=${this.player.options.autoplay ? 1 : 0}&enablejsapi=1&controls=0&rel=0&playsinline=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen style="width:100%;height:100%;border:none;"></iframe>`;
+      if (this.player.ui) this.player.ui.showSpinner(false);
+      return;
     }
 
     return new Promise(resolve => {
       try {
         const originUrl = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file')) ? window.location.origin : undefined;
+        const playerVars = {
+          autoplay: this.player.options.autoplay ? 1 : 0,
+          controls: 0,
+          rel: 0,
+          playsinline: 1,
+          enablejsapi: 1,
+          fs: 0,
+          disablekb: 1,
+          iv_load_policy: 3
+        };
+        if (originUrl) {
+          playerVars.origin = originUrl;
+        }
+
         this.ytPlayer = new window.YT.Player(mountNode, {
+          host: 'https://www.youtube-nocookie.com',
           videoId: videoId,
-          playerVars: {
-            autoplay: this.player.options.autoplay ? 1 : 0,
-            controls: 0,
-            modestbranding: 1,
-            rel: 0,
-            iv_load_policy: 3,
-            playsinline: 1,
-            disablekb: 1,
-            fs: 0,
-            enablejsapi: 1,
-            origin: originUrl
-          },
+          playerVars: playerVars,
           events: {
             onReady: () => {
               if (this.player.ui) this.player.ui.showSpinner(false);
+              try {
+                const iframe = ytWrapper.querySelector('iframe');
+                if (iframe) {
+                  iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+                  iframe.setAttribute('allowfullscreen', 'true');
+                }
+              } catch (_) {}
               // Apply volume & rate settings once ready
               try {
                 this.ytPlayer.setVolume(this.player.getVolume() * 100);
                 if (this.player.isMuted()) this.ytPlayer.mute();
                 this.ytPlayer.setPlaybackRate(this.player.getPlaybackRate());
-                if (this.player.options.autoplay) {
-                  try {
-                    const res = this.ytPlayer.playVideo();
-                    if (res && typeof res.catch === 'function') res.catch(() => {});
-                  } catch (_) {
-                    try {
-                      this.ytPlayer.mute();
-                      this.player.toggleMute(true);
-                      const res2 = this.ytPlayer.playVideo();
-                      if (res2 && typeof res2.catch === 'function') res2.catch(() => {});
-                    } catch (_) {}
-                  }
+                if (this.player.options.autoplay || this._pendingPlay) {
+                  this._pendingPlay = false;
+                  this.play();
                 }
               } catch (_) {}
               this.startYouTubeSync();
@@ -921,7 +949,8 @@ class SourceManager {
         });
       } catch (err) {
         console.warn('[LiQuPlayer] YT.Player instantiation error, using fallback iframe:', err);
-        mountNode.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="width:100%;height:100%;border:none;"></iframe>`;
+        mountNode.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=${this.player.options.autoplay ? 1 : 0}&enablejsapi=1&controls=0&rel=0&playsinline=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen style="width:100%;height:100%;border:none;"></iframe>`;
+        if (this.player.ui) this.player.ui.showSpinner(false);
         resolve();
       }
     });
@@ -1089,41 +1118,64 @@ class SourceManager {
   }
 
   play() {
-    if (this.sourceType === 'youtube' && this.ytPlayer && this.ytPlayer.playVideo) {
-      try {
-        const res = this.ytPlayer.playVideo();
-        if (res && typeof res.catch === 'function') {
-          res.catch(() => {
-            try {
-              this.ytPlayer.mute();
-              this.player.toggleMute(true);
-              const res2 = this.ytPlayer.playVideo();
-              if (res2 && typeof res2.catch === 'function') res2.catch(() => {});
-            } catch (_) {}
-          });
-        }
-      } catch (_) {
+    if (this._isLoading) {
+      this._pendingPlay = true;
+    }
+    if (this.sourceType === 'youtube') {
+      if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
         try {
-          this.ytPlayer.mute();
-          this.player.toggleMute(true);
-          const res2 = this.ytPlayer.playVideo();
-          if (res2 && typeof res2.catch === 'function') res2.catch(() => {});
+          this.ytPlayer.playVideo();
+        } catch (_) {
+          try {
+            this.ytPlayer.mute();
+            this.player.toggleMute(true);
+            this.ytPlayer.playVideo();
+          } catch (_) {}
+        }
+        // Browser autoplay policy safety retry after 500ms
+        setTimeout(() => {
+          if (this.sourceType === 'youtube' && this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function') {
+            try {
+              const st = this.ytPlayer.getPlayerState();
+              if (st !== 1 && st !== 3) {
+                this.ytPlayer.mute();
+                this.player.toggleMute(true);
+                this.ytPlayer.playVideo();
+              }
+            } catch (_) {}
+          }
+        }, 500);
+      } else {
+        // Fallback iframe postMessage
+        const iframe = this.player.container.querySelector('.liqu-youtube-frame iframe');
+        if (iframe && iframe.contentWindow) {
+          try {
+            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+          } catch (_) {}
+        }
+      }
+      return;
+    }
+
+    if (this.sourceType === 'vimeo') {
+      if (this.vimeoPlayer) {
+        try {
+          const res = this.vimeoPlayer.play();
+          if (res && typeof res.catch === 'function') {
+            res.catch(() => {
+              try {
+                this.vimeoPlayer.setMuted(true);
+                this.player.toggleMute(true);
+                this.vimeoPlayer.play().catch(() => {});
+              } catch (_) {}
+            });
+          }
         } catch (_) {}
       }
-    } else if (this.sourceType === 'vimeo' && this.vimeoPlayer) {
-      try {
-        const res = this.vimeoPlayer.play();
-        if (res && typeof res.catch === 'function') {
-          res.catch(() => {
-            try {
-              this.vimeoPlayer.setMuted(true);
-              this.player.toggleMute(true);
-              this.vimeoPlayer.play().catch(() => {});
-            } catch (_) {}
-          });
-        }
-      } catch (_) {}
-    } else if (this.player.video) {
+      return;
+    }
+
+    if (this.player.video) {
       try {
         const p = this.player.video.play();
         if (p && typeof p.catch === 'function') {
@@ -1145,11 +1197,28 @@ class SourceManager {
   }
 
   pause() {
-    if (this.sourceType === 'youtube' && this.ytPlayer && this.ytPlayer.pauseVideo) {
-      this.ytPlayer.pauseVideo();
-    } else if (this.sourceType === 'vimeo' && this.vimeoPlayer) {
-      this.vimeoPlayer.pause();
-    } else if (this.player.video) {
+    if (this.sourceType === 'youtube') {
+      if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
+        try { this.ytPlayer.pauseVideo(); } catch (_) {}
+      } else {
+        const iframe = this.player.container.querySelector('.liqu-youtube-frame iframe');
+        if (iframe && iframe.contentWindow) {
+          try {
+            iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+          } catch (_) {}
+        }
+      }
+      return;
+    }
+
+    if (this.sourceType === 'vimeo') {
+      if (this.vimeoPlayer) {
+        try { this.vimeoPlayer.pause(); } catch (_) {}
+      }
+      return;
+    }
+
+    if (this.player.video) {
       this.player.video.pause();
     }
   }
