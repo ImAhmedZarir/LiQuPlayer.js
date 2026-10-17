@@ -68,9 +68,14 @@ const icons = {
     <circle cx="15" cy="17" r="2" fill="currentColor"/>
   </svg>`,
 
-  download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 3v12m0 0 4-4m-4 4-4-4"/>
-    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+  quality: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="3"/>
+    <path d="M6.5 9v6m0-3h3.5m0-3v6M13.5 9v6h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-2z"/>
+  </svg>`,
+
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/>
+    <line x1="6" y1="6" x2="18" y2="18"/>
   </svg>`,
 
   pip: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -574,12 +579,6 @@ class SourceManager {
     // Hide error overlay on new load
     this.player.hideError();
 
-    // Toggle download button visibility (hide for YT, Vimeo, live stream)
-    const isEmbed = (this.sourceType === 'youtube' || this.sourceType === 'vimeo' || this.sourceType === 'test_pattern');
-    if (this.player.downloadBtn) {
-      this.player.downloadBtn.style.display = isEmbed ? 'none' : '';
-    }
-
     try {
       switch (this.sourceType) {
         case 'youtube':
@@ -659,6 +658,17 @@ class SourceManager {
           index
         }));
         this.player.emit('qualities', this.qualities);
+
+        // Sync subtitle tracks from HLS manifest
+        if (this.hlsInstance.subtitleTracks && this.hlsInstance.subtitleTracks.length > 0) {
+          const subs = this.hlsInstance.subtitleTracks.map((st, i) => ({
+            label: st.name || st.lang || `Track ${i + 1}`,
+            language: st.lang || 'en',
+            index: i
+          }));
+          this.player.setSubtitles(subs);
+        }
+
         if (this.player.options.autoplay) {
           video.play().catch(() => {});
         }
@@ -752,49 +762,63 @@ class SourceManager {
     }
 
     return new Promise(resolve => {
-      this.ytPlayer = new window.YT.Player(mountNode, {
-        videoId: videoId,
-        playerVars: {
-          autoplay: this.player.options.autoplay ? 1 : 0,
-          controls: 0,
-          modestbranding: 1,
-          rel: 0,
-          iv_load_policy: 3,
-          playsinline: 1,
-          disablekb: 1,
-          fs: 0
-        },
-        events: {
-          onReady: () => {
-            // Apply volume & rate settings once ready
-            try {
-              this.ytPlayer.setVolume(this.player.getVolume() * 100);
-              if (this.player.isMuted()) this.ytPlayer.mute();
-              this.ytPlayer.setPlaybackRate(this.player.getPlaybackRate());
-            } catch (_) {}
-            this.startYouTubeSync();
-            resolve();
+      try {
+        const originUrl = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file')) ? window.location.origin : undefined;
+        this.ytPlayer = new window.YT.Player(mountNode, {
+          videoId: videoId,
+          playerVars: {
+            autoplay: this.player.options.autoplay ? 1 : 0,
+            controls: 0,
+            modestbranding: 1,
+            rel: 0,
+            iv_load_policy: 3,
+            playsinline: 1,
+            disablekb: 1,
+            fs: 0,
+            enablejsapi: 1,
+            origin: originUrl
           },
-          onStateChange: (e) => {
-            if (e.data === window.YT.PlayerState.PLAYING) {
-              this.player._handlePlay('youtube');
-            } else if (e.data === window.YT.PlayerState.PAUSED) {
-              this.player._handlePause('youtube');
-            } else if (e.data === window.YT.PlayerState.ENDED) {
-              this.player._handleEnded('youtube');
-            } else if (e.data === window.YT.PlayerState.BUFFERING) {
-              this.player.ui.showSpinner(true);
+          events: {
+            onReady: () => {
+              // Apply volume & rate settings once ready
+              try {
+                this.ytPlayer.setVolume(this.player.getVolume() * 100);
+                if (this.player.isMuted()) this.ytPlayer.mute();
+                this.ytPlayer.setPlaybackRate(this.player.getPlaybackRate());
+              } catch (_) {}
+              this.startYouTubeSync();
+              resolve();
+            },
+            onStateChange: (e) => {
+              if (e.data === window.YT.PlayerState.PLAYING) {
+                this.player._handlePlay('youtube');
+              } else if (e.data === window.YT.PlayerState.PAUSED) {
+                this.player._handlePause('youtube');
+              } else if (e.data === window.YT.PlayerState.ENDED) {
+                this.player._handleEnded('youtube');
+              } else if (e.data === window.YT.PlayerState.BUFFERING) {
+                this.player.ui.showSpinner(true);
+              }
+            },
+            onError: (e) => {
+              let msg = 'YouTube playback failed.';
+              if (e.data === 101 || e.data === 150) {
+                msg = 'This video owner does not allow third-party embedded playback.';
+              } else if (e.data === 2) {
+                msg = 'Invalid YouTube video ID.';
+              } else if (e.data === 100) {
+                msg = 'YouTube video not found or removed.';
+              }
+              this.player.showError(msg);
+              resolve();
             }
-          },
-          onError: (e) => {
-            let msg = 'YouTube playback failed.';
-            if (e.data === 101 || e.data === 150) {
-              msg = 'This video does not allow playback in embedded players.';
-            }
-            this.player.showError(msg);
           }
-        }
-      });
+        });
+      } catch (err) {
+        console.warn('[LiQuPlayer] YT.Player instantiation error, using fallback iframe:', err);
+        mountNode.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="width:100%;height:100%;border:none;"></iframe>`;
+        resolve();
+      }
     });
   }
 
@@ -1221,13 +1245,13 @@ class UIManager {
         <button class="liqu-btn liqu-speed-btn" title="Speed" aria-label="Playback Speed">
           ${icons.speedometer}
         </button>
+        <button class="liqu-btn liqu-quality-btn" title="Quality" aria-label="Quality">
+          ${icons.quality}
+        </button>
         <button class="liqu-btn liqu-settings-btn" title="Settings" aria-label="Settings">
           ${icons.settings}
         </button>
-        <button class="liqu-btn liqu-download-btn" title="Download" aria-label="Download">
-          ${icons.download}
-        </button>
-        <button class="liqu-btn liqu-pip-btn" title="Picture in Picture" aria-label="Picture in Picture">
+        <button class="liqu-btn liqu-pip-btn" title="Picture in Picture / Floating Player" aria-label="Floating Player">
           ${icons.pip}
         </button>
         <button class="liqu-btn liqu-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">
@@ -1237,6 +1261,14 @@ class UIManager {
     `;
     this.topBar.appendChild(topRight);
     this.controlsOverlay.appendChild(this.topBar);
+
+    // Floating Player Dock Back Button (Visible when floating)
+    this.floatingDockBtn = document.createElement('button');
+    this.floatingDockBtn.className = 'liqu-btn liqu-floating-dock-btn liqu-glass-circle';
+    this.floatingDockBtn.title = 'Dock player';
+    this.floatingDockBtn.innerHTML = icons.close;
+    this.floatingDockBtn.style.display = 'none';
+    this.controlsOverlay.appendChild(this.floatingDockBtn);
 
     // CENTER CONTROLS (Floating Liquid Glass Bubbles)
     this.centerControls = document.createElement('div');
@@ -1254,6 +1286,15 @@ class UIManager {
       </button>
     `;
     this.controlsOverlay.appendChild(this.centerControls);
+
+    // SUBTITLE / CAPTIONS DISPLAY LAYER (Authentic Frosted Liquid Typography)
+    this.captionsLayer = document.createElement('div');
+    this.captionsLayer.className = 'liqu-captions-layer';
+    this.captionsLayer.style.display = 'none';
+    this.captionsText = document.createElement('div');
+    this.captionsText.className = 'liqu-captions-text';
+    this.captionsLayer.appendChild(this.captionsText);
+    this.controlsOverlay.appendChild(this.captionsLayer);
 
     // NEXT EPISODE PILL (If configured)
     if (this.opts.nextEpisode) {
@@ -1303,8 +1344,8 @@ class UIManager {
     this.volSlider = this.topBar.querySelector('.liqu-vol-slider');
     this.ccBtn = this.topBar.querySelector('.liqu-cc-btn');
     this.speedBtn = this.topBar.querySelector('.liqu-speed-btn');
+    this.qualityBtn = this.topBar.querySelector('.liqu-quality-btn');
     this.settingsBtn = this.topBar.querySelector('.liqu-settings-btn');
-    this.downloadBtn = this.topBar.querySelector('.liqu-download-btn');
     this.pipBtn = this.topBar.querySelector('.liqu-pip-btn');
     this.fullscreenBtn = this.topBar.querySelector('.liqu-fullscreen-btn');
     this.timeCurrent = this.bottomDock.querySelector('.liqu-time-current');
@@ -1313,7 +1354,6 @@ class UIManager {
     this.scrubProgress = this.bottomDock.querySelector('.liqu-scrub-progress');
     this.scrubBuffer = this.bottomDock.querySelector('.liqu-scrub-buffer');
     this.scrubTooltip = this.bottomDock.querySelector('.liqu-scrub-tooltip');
-    this.player.downloadBtn = this.downloadBtn;
 
     // Apply liquid glass engine
     this.applyLiquidMaterials();
@@ -1386,6 +1426,10 @@ class UIManager {
       e.stopPropagation();
       this.toggleMenu('speed');
     });
+    this.qualityBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleMenu('quality');
+    });
     this.settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleMenu('settings');
@@ -1395,12 +1439,10 @@ class UIManager {
       this.toggleMenu('subtitles');
     });
 
-    if (this.downloadBtn) {
-      this.downloadBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.handleDownload();
-      });
-    }
+    this.floatingDockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.player.toggleFloatingMode(false);
+    });
 
     this.pipBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1532,6 +1574,42 @@ class UIManager {
       const bufEnd = buffered.end(buffered.length - 1);
       const bufPercent = (bufEnd / duration) * 100;
       this.scrubBuffer.style.width = `${Math.min(bufPercent, 100)}%`;
+    }
+
+    // Active subtitle cue update
+    this.updateActiveCaption(current);
+  }
+
+  updateActiveCaption(current) {
+    if (!this.captionsLayer) return;
+    if (this.activeSubtitleTrack < 0) {
+      this.captionsLayer.style.display = 'none';
+      return;
+    }
+
+    let text = '';
+    const tracks = this.opts.subtitles || [];
+    const activeTrack = tracks[this.activeSubtitleTrack];
+
+    // 1. Check custom cues array
+    if (activeTrack && Array.isArray(activeTrack.cues)) {
+      const match = activeTrack.cues.find(c => current >= c.start && current <= c.end);
+      if (match) text = match.text;
+    }
+
+    // 2. Check native textTrack activeCues
+    if (!text && this.video && this.video.textTracks && this.video.textTracks[this.activeSubtitleTrack]) {
+      const nativeTrack = this.video.textTracks[this.activeSubtitleTrack];
+      if (nativeTrack.activeCues && nativeTrack.activeCues.length > 0) {
+        text = nativeTrack.activeCues[0].text;
+      }
+    }
+
+    if (text) {
+      this.captionsText.textContent = text;
+      this.captionsLayer.style.display = 'flex';
+    } else {
+      this.captionsLayer.style.display = 'none';
     }
   }
 
@@ -1697,9 +1775,9 @@ class UIManager {
     }
 
     return `
-      <div class="liqu-menu-header" style="display:flex;align-items:center;gap:8px;">
-        <button class="liqu-btn" data-goto="settings" style="width:24px;height:24px;">${icons.back}</button>
-        <span>Quality Selection</span>
+      <div class="liqu-menu-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Video Quality</span>
+        <span style="font-size:12px;opacity:0.7;">${this.getQualityLabel()}</span>
       </div>
       <div class="liqu-menu-list">
         <button class="liqu-menu-item ${curIdx === -1 ? 'liqu-item-active' : ''}" data-quality="-1">
@@ -1752,7 +1830,7 @@ class UIManager {
       } else if (type === 'quality' && btn.dataset.quality) {
         const qIdx = parseInt(btn.dataset.quality, 10);
         this.player.sourceManager.setQuality(qIdx);
-        this.player.showHUD(icons.settings, `Quality: ${this.getQualityLabel()}`);
+        this.showHUD(icons.quality, `Quality: ${this.getQualityLabel()}`);
         this.closeMenu();
       } else if (type === 'settings') {
         if (btn.dataset.glass) {
@@ -1776,13 +1854,20 @@ class UIManager {
   setSubtitleTrack(index) {
     this.activeSubtitleTrack = index;
     const v = this.video;
-    if (v.textTracks) {
+    if (v && v.textTracks) {
       for (let i = 0; i < v.textTracks.length; i++) {
         v.textTracks[i].mode = (i === index) ? 'showing' : 'disabled';
       }
     }
-    const label = index === -1 ? 'Subtitles Off' : `Subtitles: Track ${index + 1}`;
-    this.showHUD(icons.subtitles, label);
+    const tracks = this.opts.subtitles || [];
+    if (index === -1) {
+      if (this.captionsLayer) this.captionsLayer.style.display = 'none';
+      this.showHUD(icons.subtitles, 'Subtitles: Off');
+    } else {
+      const label = (tracks[index] && tracks[index].label) ? tracks[index].label : `Track ${index + 1}`;
+      this.showHUD(icons.subtitles, `Subtitles: ${label}`);
+      this.updateActiveCaption(this.player.getCurrentTime());
+    }
   }
 
   setSubtitles(tracks) {
@@ -1804,22 +1889,6 @@ class UIManager {
         }
         this.video.appendChild(track);
       });
-    }
-  }
-
-  handleDownload() {
-    const src = this.player.sourceManager.currentSource;
-    const url = typeof src === 'string' ? src : (src && src.src ? src.src : null);
-    if (url && (url.startsWith('http') || url.startsWith('blob'))) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = (this.player.title || 'video').replace(/[^a-zA-Z0-9_-]/g, '_') + '.mp4';
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } else {
-      this.showHUD(icons.download, 'Stream Download Unavailable');
     }
   }
 
@@ -2451,7 +2520,7 @@ class LiQuPlayer {
   setQuality(index) {
     this.sourceManager.setQuality(index);
     if (this.ui) {
-      this.ui.showHUD(icons.settings, `Quality: ${this.ui.getQualityLabel()}`);
+      this.ui.showHUD(icons.quality, `Quality: ${this.ui.getQualityLabel()}`);
     }
   }
 
@@ -2480,11 +2549,39 @@ class LiQuPlayer {
     }
   }
 
+  toggleFloatingMode(force) {
+    const isFloating = force !== undefined ? force : !this.container.classList.contains('liqu-floating-pip');
+    if (isFloating) {
+      this.container.classList.add('liqu-floating-pip');
+      this.showHUD(icons.pip, 'Floating Miniplayer');
+      this.emit('floatingchange', true);
+    } else {
+      this.container.classList.remove('liqu-floating-pip');
+      this.showHUD(icons.pip, 'Docked Player');
+      this.emit('floatingchange', false);
+    }
+  }
+
   async togglePiP() {
+    const sm = this.sourceManager;
+    const isEmbed = sm && (sm.sourceType === 'youtube' || sm.sourceType === 'vimeo');
+
+    // For embeds or browsers without native PiP support, trigger liquid floating miniplayer
+    if (isEmbed || !document.pictureInPictureEnabled || !this.video) {
+      this.toggleFloatingMode();
+      return;
+    }
+
     try {
-      if (document.pictureInPictureElement) await document.exitPictureInPicture();
-      else if (document.pictureInPictureEnabled && this.video) await this.video.requestPictureInPicture();
-    } catch (_) {}
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await this.video.requestPictureInPicture();
+      }
+    } catch (_) {
+      // Fallback seamlessly to liquid floating miniplayer
+      this.toggleFloatingMode();
+    }
   }
 
   showError(msg) {
@@ -2523,13 +2620,6 @@ class LiQuPlayer {
       const titleSub = this.container.querySelector('.liqu-title-sub');
       if (titleSub && meta.subtitle) titleSub.textContent = meta.subtitle;
       if (this.video && meta.poster) this.video.poster = meta.poster;
-
-      // Update download button visibility
-      const srcType = this.sourceManager.detectSourceType(src);
-      if (this.ui.downloadBtn) {
-        const canDownload = (srcType === 'direct');
-        this.ui.downloadBtn.style.display = canDownload ? 'inline-flex' : 'none';
-      }
     }
 
     if (this.mediaSessionManager) {

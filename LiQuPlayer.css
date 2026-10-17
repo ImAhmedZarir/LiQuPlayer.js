@@ -190,6 +190,7 @@
 /* ---- Top Bar ---- */
 .liqu-top-bar {
   display: flex;
+  flex-wrap: nowrap;
   justify-content: space-between;
   align-items: center;
   width: 100%;
@@ -956,4 +957,116 @@
   .liqu-scrub-rail { height: 4px !important; }
   .liqu-scrub-thumb { width: 14px !important; height: 14px !important; right: -7px !important; }
   .liqu-popover { top: 50px !important; right: 10px !important; width: 220px !important; padding: 12px !important; }
+  .liqu-captions-layer { bottom: 58px !important; max-width: 90% !important; }
+  .liqu-captions-text { font-size: 13px !important; padding: 4px 12px !important; }
 }
+
+/* ---- In-Page Liquid Floating Miniplayer ---- */
+.liqu-player-container.liqu-floating-pip {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  width: 360px !important;
+  max-width: calc(100vw - 32px) !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9 !important;
+  z-index: 999999 !important;
+  border-radius: 18px !important;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.75),
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
+  overflow: hidden !important;
+  animation: liqu-float-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes liqu-float-in {
+  0% { transform: scale(0.85) translateY(20px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.liqu-floating-dock-btn {
+  display: none;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  align-items: center;
+  justify-content: center;
+}
+
+.liqu-floating-dock-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke: #fff;
+}
+
+.liqu-floating-dock-btn:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  transform: scale(1.08);
+}
+
+.liqu-player-container.liqu-floating-pip .liqu-floating-dock-btn {
+  display: inline-flex !important;
+}
+
+.liqu-player-container.liqu-floating-pip .liqu-top-bar,
+.liqu-player-container.liqu-floating-pip .liqu-ambient-glow {
+  display: none !important;
+}
+
+/* ---- Frosted Liquid Captions / Subtitles Layer ---- */
+.liqu-captions-layer {
+  position: absolute;
+  left: 50%;
+  bottom: 82px;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  max-width: 85%;
+  text-align: center;
+  transition: bottom 0.25s ease;
+}
+
+.liqu-player-container.liqu-idle .liqu-captions-layer {
+  bottom: 26px;
+}
+
+.liqu-captions-text {
+  display: inline-block;
+  padding: 6px 16px;
+  background: rgba(12, 17, 28, 0.75);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  word-break: break-word;
+}
+
+.liqu-player-container.liqu-compact-mode .liqu-captions-layer,
+.device-stage.mobile-view .liqu-player-container .liqu-captions-layer {
+  bottom: 58px !important;
+  max-width: 90% !important;
+}
+.liqu-player-container.liqu-compact-mode .liqu-captions-text,
+.device-stage.mobile-view .liqu-player-container .liqu-captions-text {
+  font-size: 13px !important;
+  padding: 4px 12px !important;
+}
+

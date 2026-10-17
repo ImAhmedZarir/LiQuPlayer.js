@@ -276,7 +276,7 @@ export class LiQuPlayer {
   setQuality(index) {
     this.sourceManager.setQuality(index);
     if (this.ui) {
-      this.ui.showHUD(icons.settings, `Quality: ${this.ui.getQualityLabel()}`);
+      this.ui.showHUD(icons.quality, `Quality: ${this.ui.getQualityLabel()}`);
     }
   }
 
@@ -305,11 +305,39 @@ export class LiQuPlayer {
     }
   }
 
+  toggleFloatingMode(force) {
+    const isFloating = force !== undefined ? force : !this.container.classList.contains('liqu-floating-pip');
+    if (isFloating) {
+      this.container.classList.add('liqu-floating-pip');
+      this.showHUD(icons.pip, 'Floating Miniplayer');
+      this.emit('floatingchange', true);
+    } else {
+      this.container.classList.remove('liqu-floating-pip');
+      this.showHUD(icons.pip, 'Docked Player');
+      this.emit('floatingchange', false);
+    }
+  }
+
   async togglePiP() {
+    const sm = this.sourceManager;
+    const isEmbed = sm && (sm.sourceType === 'youtube' || sm.sourceType === 'vimeo');
+
+    // For embeds or browsers without native PiP support, trigger liquid floating miniplayer
+    if (isEmbed || !document.pictureInPictureEnabled || !this.video) {
+      this.toggleFloatingMode();
+      return;
+    }
+
     try {
-      if (document.pictureInPictureElement) await document.exitPictureInPicture();
-      else if (document.pictureInPictureEnabled && this.video) await this.video.requestPictureInPicture();
-    } catch (_) {}
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await this.video.requestPictureInPicture();
+      }
+    } catch (_) {
+      // Fallback seamlessly to liquid floating miniplayer
+      this.toggleFloatingMode();
+    }
   }
 
   showError(msg) {
@@ -348,13 +376,6 @@ export class LiQuPlayer {
       const titleSub = this.container.querySelector('.liqu-title-sub');
       if (titleSub && meta.subtitle) titleSub.textContent = meta.subtitle;
       if (this.video && meta.poster) this.video.poster = meta.poster;
-
-      // Update download button visibility
-      const srcType = this.sourceManager.detectSourceType(src);
-      if (this.ui.downloadBtn) {
-        const canDownload = (srcType === 'direct');
-        this.ui.downloadBtn.style.display = canDownload ? 'inline-flex' : 'none';
-      }
     }
 
     if (this.mediaSessionManager) {

@@ -45,9 +45,14 @@ export const icons = {
     <circle cx="15" cy="17" r="2" fill="currentColor"/>
   </svg>`,
 
-  download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 3v12m0 0 4-4m-4 4-4-4"/>
-    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+  quality: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="3"/>
+    <path d="M6.5 9v6m0-3h3.5m0-3v6M13.5 9v6h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-2z"/>
+  </svg>`,
+
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/>
+    <line x1="6" y1="6" x2="18" y2="18"/>
   </svg>`,
 
   pip: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -115,7 +115,7 @@
 | `volume` | `number` | `1` | Initial volume between `0` and `1` |
 | `glassMode` | `'ultra'` \| `'balanced'` \| `'lite'` | `'ultra'` | Liquid glass rendering complexity |
 | `ambientGlow` | `boolean` | `true` | Real-time reactive ambient lighting |
-| `downloadable` | `boolean` | `true` | Show download action in top dock |
+| `subtitles` | `array` | `[]` | Subtitle tracks `[{ lang, label, cues: [{ start, end, text }] }]` |
 | `nextEpisode` | `object` | `null` | Config `{ title: 'Next · S1 E2', onClick: fn }` |
 
 ---
@@ -136,15 +136,21 @@ player.setVolume(0.8);       // 0.0 to 1.0
 player.toggleMute();
 player.setPlaybackRate(1.5); // 0.25x to 2.0x
 
+// Separate Quality Selection & Subtitles
+player.setQuality(0);        // Quality level index, or -1 for Auto
+player.setSubtitles(tracks); // Set or update subtitle tracks
+player.toggleCaptions();     // Cycle or toggle subtitle visibility
+
 // Source & Metadata
 player.setSource('https://example.com/another.mp4', {
   title: 'Parallel Hearts',
   subtitle: 'S1 · E2'
 });
 
-// Fullscreen & PiP
+// Fullscreen, Dual-Mode PiP & Floating Miniplayer
 player.toggleFullscreen();
-player.togglePiP();
+player.togglePiP();          // Dual-mode: Native browser PiP or Floating Miniplayer
+player.toggleFloatingMode(); // In-page liquid floating miniplayer dock/undock
 
 // Liquid Glass Tuning
 player.liquidEngine.setMode('balanced'); // Switch between 'ultra', 'balanced', 'lite'

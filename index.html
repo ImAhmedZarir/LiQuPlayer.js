@@ -549,13 +549,15 @@
         <button class="bench-btn" onclick="player.seekBy(10)">Forward +10s</button>
         <button class="bench-btn" onclick="player.setPlaybackRate(1.5)">Speed 1.5x</button>
         <button class="bench-btn" onclick="player.setPlaybackRate(1.0)">Speed 1.0x</button>
+        <button class="bench-btn" onclick="player.toggleCaptions()">Toggle Captions</button>
+        <button class="bench-btn" onclick="player.ui.toggleMenu('quality')">Open Quality Menu</button>
         <button class="bench-btn" onclick="player.setQuality(0)">Quality: 1080p</button>
         <button class="bench-btn" onclick="player.setQuality(1)">Quality: 720p</button>
-        <button class="bench-btn" onclick="player.setQuality(2)">Quality: 480p</button>
         <button class="bench-btn" onclick="player.setQuality(-1)">Quality: Auto</button>
         <button class="bench-btn" onclick="player.toggleAmbientGlow()">Toggle Cinema Glow</button>
         <button class="bench-btn" onclick="player.toggleFullscreen()">Toggle Fullscreen</button>
-        <button class="bench-btn" onclick="player.togglePiP()">Toggle PiP</button>
+        <button class="bench-btn" onclick="player.togglePiP()">Toggle PiP / Miniplayer</button>
+        <button class="bench-btn" onclick="player.toggleFloatingMode()">In-Page Floating Player</button>
         <button class="bench-btn" onclick="player.liquidEngine.setMode('ultra')">Mode: Ultra Fluid</button>
         <button class="bench-btn" onclick="player.liquidEngine.setMode('balanced')">Mode: Balanced</button>
         <button class="bench-btn" onclick="player.liquidEngine.setMode('lite')">Mode: Lite (Low RAM)</button>
@@ -645,12 +647,46 @@
   <!-- Scripts -->
   <script src="LiQuPlayer.js"></script>
   <script>
+    const demoSubtitles = [
+      {
+        lang: 'en',
+        label: 'English',
+        cues: [
+          { start: 0, end: 4, text: 'Across the endless sea, the voyage begins.' },
+          { start: 4.1, end: 8, text: 'Through tempest winds and treacherous tides...' },
+          { start: 8.1, end: 14, text: 'Every legend is forged in fire and courage.' },
+          { start: 14.1, end: 22, text: 'Welcome aboard the Odyssey.' }
+        ]
+      },
+      {
+        lang: 'es',
+        label: 'Español',
+        cues: [
+          { start: 0, end: 4, text: 'A través del mar infinito, comienza el viaje.' },
+          { start: 4.1, end: 8, text: 'Entre vientos de tormenta y mareas traicioneras...' },
+          { start: 8.1, end: 14, text: 'Cada leyenda se forja en el fuego y el coraje.' },
+          { start: 14.1, end: 22, text: 'Bienvenidos a bordo de la Odisea.' }
+        ]
+      },
+      {
+        lang: 'bn',
+        label: 'বাংলা (Bengali)',
+        cues: [
+          { start: 0, end: 4, text: 'অনন্ত সমুদ্রের বুক চিরে শুরু হলো মহাযাত্রা।' },
+          { start: 4.1, end: 8, text: 'ঝড়ো বাতাস আর উত্তাল তরঙ্গের মাঝে...' },
+          { start: 8.1, end: 14, text: 'প্রতিটি ইতিহাস জন্ম নেয় সাহস আর ত্যাগের মধ্যে।' },
+          { start: 14.1, end: 22, text: 'ওডিসি অভিযানে আপনাকে স্বাগতম।' }
+        ]
+      }
+    ];
+
     const presets = {
       odyssey: {
         source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
         title: 'The Odyssey - The Real Story',
         subtitle: 'S1 · E1',
         poster: 'assets/images/preview-odyssey-ship.png',
+        subtitles: demoSubtitles,
         nextEpisode: { title: 'Next · S1 E2', onClick: () => alert('Next Episode Loading...') }
       },
       pattern: {
@@ -658,19 +694,22 @@
         title: 'Parallel Hearts',
         subtitle: 'S1 · E1',
         poster: 'assets/images/preview-desktop-glass.png',
+        subtitles: demoSubtitles,
         nextEpisode: { title: 'Next · S1 E2', onClick: () => alert('Next Episode Loading...') }
       },
       gold: {
         source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
         title: 'Gold Ambient Pulse',
         subtitle: 'Live Showcase',
-        poster: 'assets/images/preview-led-gold.png'
+        poster: 'assets/images/preview-led-gold.png',
+        subtitles: demoSubtitles
       },
       hls: {
         source: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
         title: 'Tears of Steel (4K HLS)',
         subtitle: 'Blender Open Movie',
-        poster: 'assets/images/preview-odyssey-aerial.jpg'
+        poster: 'assets/images/preview-odyssey-aerial.jpg',
+        subtitles: demoSubtitles
       },
       youtube: {
         source: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
@@ -681,7 +720,8 @@
         source: 'https://ahmedzarir.html-5.me/dev/test.mp4',
         title: 'Dev Server Test',
         subtitle: 'CORS-less Direct MP4',
-        poster: 'assets/images/preview-desktop-glass.png'
+        poster: 'assets/images/preview-desktop-glass.png',
+        subtitles: demoSubtitles
       }
     };
 
@@ -700,6 +740,9 @@
         title: 'Custom Media Stream',
         subtitle: url.length > 40 ? url.substring(0, 40) + '...' : url
       });
+      setTimeout(() => {
+        try { player.play(); } catch (_) {}
+      }, 250);
     };
     if (customPlayBtn) customPlayBtn.addEventListener('click', playCustomStream);
     if (customInput) {
@@ -716,6 +759,10 @@
         const p = presets[btn.dataset.preset];
         if (p) {
           player.setSource(p.source, { title: p.title, subtitle: p.subtitle, poster: p.poster });
+          if (p.subtitles) player.setSubtitles(p.subtitles);
+          setTimeout(() => {
+            try { player.play(); } catch (_) {}
+          }, 250);
         }
       });
     });

@@ -143,13 +143,13 @@ export class UIManager {
         <button class="liqu-btn liqu-speed-btn" title="Speed" aria-label="Playback Speed">
           ${icons.speedometer}
         </button>
+        <button class="liqu-btn liqu-quality-btn" title="Quality" aria-label="Quality">
+          ${icons.quality}
+        </button>
         <button class="liqu-btn liqu-settings-btn" title="Settings" aria-label="Settings">
           ${icons.settings}
         </button>
-        <button class="liqu-btn liqu-download-btn" title="Download" aria-label="Download">
-          ${icons.download}
-        </button>
-        <button class="liqu-btn liqu-pip-btn" title="Picture in Picture" aria-label="Picture in Picture">
+        <button class="liqu-btn liqu-pip-btn" title="Picture in Picture / Floating Player" aria-label="Floating Player">
           ${icons.pip}
         </button>
         <button class="liqu-btn liqu-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">
@@ -159,6 +159,14 @@ export class UIManager {
     `;
     this.topBar.appendChild(topRight);
     this.controlsOverlay.appendChild(this.topBar);
+
+    // Floating Player Dock Back Button (Visible when floating)
+    this.floatingDockBtn = document.createElement('button');
+    this.floatingDockBtn.className = 'liqu-btn liqu-floating-dock-btn liqu-glass-circle';
+    this.floatingDockBtn.title = 'Dock player';
+    this.floatingDockBtn.innerHTML = icons.close;
+    this.floatingDockBtn.style.display = 'none';
+    this.controlsOverlay.appendChild(this.floatingDockBtn);
 
     // CENTER CONTROLS (Floating Liquid Glass Bubbles)
     this.centerControls = document.createElement('div');
@@ -176,6 +184,15 @@ export class UIManager {
       </button>
     `;
     this.controlsOverlay.appendChild(this.centerControls);
+
+    // SUBTITLE / CAPTIONS DISPLAY LAYER (Authentic Frosted Liquid Typography)
+    this.captionsLayer = document.createElement('div');
+    this.captionsLayer.className = 'liqu-captions-layer';
+    this.captionsLayer.style.display = 'none';
+    this.captionsText = document.createElement('div');
+    this.captionsText.className = 'liqu-captions-text';
+    this.captionsLayer.appendChild(this.captionsText);
+    this.controlsOverlay.appendChild(this.captionsLayer);
 
     // NEXT EPISODE PILL (If configured)
     if (this.opts.nextEpisode) {
@@ -225,8 +242,8 @@ export class UIManager {
     this.volSlider = this.topBar.querySelector('.liqu-vol-slider');
     this.ccBtn = this.topBar.querySelector('.liqu-cc-btn');
     this.speedBtn = this.topBar.querySelector('.liqu-speed-btn');
+    this.qualityBtn = this.topBar.querySelector('.liqu-quality-btn');
     this.settingsBtn = this.topBar.querySelector('.liqu-settings-btn');
-    this.downloadBtn = this.topBar.querySelector('.liqu-download-btn');
     this.pipBtn = this.topBar.querySelector('.liqu-pip-btn');
     this.fullscreenBtn = this.topBar.querySelector('.liqu-fullscreen-btn');
     this.timeCurrent = this.bottomDock.querySelector('.liqu-time-current');
@@ -235,7 +252,6 @@ export class UIManager {
     this.scrubProgress = this.bottomDock.querySelector('.liqu-scrub-progress');
     this.scrubBuffer = this.bottomDock.querySelector('.liqu-scrub-buffer');
     this.scrubTooltip = this.bottomDock.querySelector('.liqu-scrub-tooltip');
-    this.player.downloadBtn = this.downloadBtn;
 
     // Apply liquid glass engine
     this.applyLiquidMaterials();
@@ -308,6 +324,10 @@ export class UIManager {
       e.stopPropagation();
       this.toggleMenu('speed');
     });
+    this.qualityBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleMenu('quality');
+    });
     this.settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleMenu('settings');
@@ -317,12 +337,10 @@ export class UIManager {
       this.toggleMenu('subtitles');
     });
 
-    if (this.downloadBtn) {
-      this.downloadBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.handleDownload();
-      });
-    }
+    this.floatingDockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.player.toggleFloatingMode(false);
+    });
 
     this.pipBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -454,6 +472,42 @@ export class UIManager {
       const bufEnd = buffered.end(buffered.length - 1);
       const bufPercent = (bufEnd / duration) * 100;
       this.scrubBuffer.style.width = `${Math.min(bufPercent, 100)}%`;
+    }
+
+    // Active subtitle cue update
+    this.updateActiveCaption(current);
+  }
+
+  updateActiveCaption(current) {
+    if (!this.captionsLayer) return;
+    if (this.activeSubtitleTrack < 0) {
+      this.captionsLayer.style.display = 'none';
+      return;
+    }
+
+    let text = '';
+    const tracks = this.opts.subtitles || [];
+    const activeTrack = tracks[this.activeSubtitleTrack];
+
+    // 1. Check custom cues array
+    if (activeTrack && Array.isArray(activeTrack.cues)) {
+      const match = activeTrack.cues.find(c => current >= c.start && current <= c.end);
+      if (match) text = match.text;
+    }
+
+    // 2. Check native textTrack activeCues
+    if (!text && this.video && this.video.textTracks && this.video.textTracks[this.activeSubtitleTrack]) {
+      const nativeTrack = this.video.textTracks[this.activeSubtitleTrack];
+      if (nativeTrack.activeCues && nativeTrack.activeCues.length > 0) {
+        text = nativeTrack.activeCues[0].text;
+      }
+    }
+
+    if (text) {
+      this.captionsText.textContent = text;
+      this.captionsLayer.style.display = 'flex';
+    } else {
+      this.captionsLayer.style.display = 'none';
     }
   }
 
@@ -619,9 +673,9 @@ export class UIManager {
     }
 
     return `
-      <div class="liqu-menu-header" style="display:flex;align-items:center;gap:8px;">
-        <button class="liqu-btn" data-goto="settings" style="width:24px;height:24px;">${icons.back}</button>
-        <span>Quality Selection</span>
+      <div class="liqu-menu-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Video Quality</span>
+        <span style="font-size:12px;opacity:0.7;">${this.getQualityLabel()}</span>
       </div>
       <div class="liqu-menu-list">
         <button class="liqu-menu-item ${curIdx === -1 ? 'liqu-item-active' : ''}" data-quality="-1">
@@ -674,7 +728,7 @@ export class UIManager {
       } else if (type === 'quality' && btn.dataset.quality) {
         const qIdx = parseInt(btn.dataset.quality, 10);
         this.player.sourceManager.setQuality(qIdx);
-        this.player.showHUD(icons.settings, `Quality: ${this.getQualityLabel()}`);
+        this.showHUD(icons.quality, `Quality: ${this.getQualityLabel()}`);
         this.closeMenu();
       } else if (type === 'settings') {
         if (btn.dataset.glass) {
@@ -698,13 +752,20 @@ export class UIManager {
   setSubtitleTrack(index) {
     this.activeSubtitleTrack = index;
     const v = this.video;
-    if (v.textTracks) {
+    if (v && v.textTracks) {
       for (let i = 0; i < v.textTracks.length; i++) {
         v.textTracks[i].mode = (i === index) ? 'showing' : 'disabled';
       }
     }
-    const label = index === -1 ? 'Subtitles Off' : `Subtitles: Track ${index + 1}`;
-    this.showHUD(icons.subtitles, label);
+    const tracks = this.opts.subtitles || [];
+    if (index === -1) {
+      if (this.captionsLayer) this.captionsLayer.style.display = 'none';
+      this.showHUD(icons.subtitles, 'Subtitles: Off');
+    } else {
+      const label = (tracks[index] && tracks[index].label) ? tracks[index].label : `Track ${index + 1}`;
+      this.showHUD(icons.subtitles, `Subtitles: ${label}`);
+      this.updateActiveCaption(this.player.getCurrentTime());
+    }
   }
 
   setSubtitles(tracks) {
@@ -726,22 +787,6 @@ export class UIManager {
         }
         this.video.appendChild(track);
       });
-    }
-  }
-
-  handleDownload() {
-    const src = this.player.sourceManager.currentSource;
-    const url = typeof src === 'string' ? src : (src && src.src ? src.src : null);
-    if (url && (url.startsWith('http') || url.startsWith('blob'))) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = (this.player.title || 'video').replace(/[^a-zA-Z0-9_-]/g, '_') + '.mp4';
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } else {
-      this.showHUD(icons.download, 'Stream Download Unavailable');
     }
   }
 

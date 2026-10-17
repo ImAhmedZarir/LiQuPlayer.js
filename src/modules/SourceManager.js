@@ -44,12 +44,6 @@ export class SourceManager {
     // Hide error overlay on new load
     this.player.hideError();
 
-    // Toggle download button visibility (hide for YT, Vimeo, live stream)
-    const isEmbed = (this.sourceType === 'youtube' || this.sourceType === 'vimeo' || this.sourceType === 'test_pattern');
-    if (this.player.downloadBtn) {
-      this.player.downloadBtn.style.display = isEmbed ? 'none' : '';
-    }
-
     try {
       switch (this.sourceType) {
         case 'youtube':
@@ -129,6 +123,17 @@ export class SourceManager {
           index
         }));
         this.player.emit('qualities', this.qualities);
+
+        // Sync subtitle tracks from HLS manifest
+        if (this.hlsInstance.subtitleTracks && this.hlsInstance.subtitleTracks.length > 0) {
+          const subs = this.hlsInstance.subtitleTracks.map((st, i) => ({
+            label: st.name || st.lang || `Track ${i + 1}`,
+            language: st.lang || 'en',
+            index: i
+          }));
+          this.player.setSubtitles(subs);
+        }
+
         if (this.player.options.autoplay) {
           video.play().catch(() => {});
         }
@@ -222,49 +227,63 @@ export class SourceManager {
     }
 
     return new Promise(resolve => {
-      this.ytPlayer = new window.YT.Player(mountNode, {
-        videoId: videoId,
-        playerVars: {
-          autoplay: this.player.options.autoplay ? 1 : 0,
-          controls: 0,
-          modestbranding: 1,
-          rel: 0,
-          iv_load_policy: 3,
-          playsinline: 1,
-          disablekb: 1,
-          fs: 0
-        },
-        events: {
-          onReady: () => {
-            // Apply volume & rate settings once ready
-            try {
-              this.ytPlayer.setVolume(this.player.getVolume() * 100);
-              if (this.player.isMuted()) this.ytPlayer.mute();
-              this.ytPlayer.setPlaybackRate(this.player.getPlaybackRate());
-            } catch (_) {}
-            this.startYouTubeSync();
-            resolve();
+      try {
+        const originUrl = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file')) ? window.location.origin : undefined;
+        this.ytPlayer = new window.YT.Player(mountNode, {
+          videoId: videoId,
+          playerVars: {
+            autoplay: this.player.options.autoplay ? 1 : 0,
+            controls: 0,
+            modestbranding: 1,
+            rel: 0,
+            iv_load_policy: 3,
+            playsinline: 1,
+            disablekb: 1,
+            fs: 0,
+            enablejsapi: 1,
+            origin: originUrl
           },
-          onStateChange: (e) => {
-            if (e.data === window.YT.PlayerState.PLAYING) {
-              this.player._handlePlay('youtube');
-            } else if (e.data === window.YT.PlayerState.PAUSED) {
-              this.player._handlePause('youtube');
-            } else if (e.data === window.YT.PlayerState.ENDED) {
-              this.player._handleEnded('youtube');
-            } else if (e.data === window.YT.PlayerState.BUFFERING) {
-              this.player.ui.showSpinner(true);
+          events: {
+            onReady: () => {
+              // Apply volume & rate settings once ready
+              try {
+                this.ytPlayer.setVolume(this.player.getVolume() * 100);
+                if (this.player.isMuted()) this.ytPlayer.mute();
+                this.ytPlayer.setPlaybackRate(this.player.getPlaybackRate());
+              } catch (_) {}
+              this.startYouTubeSync();
+              resolve();
+            },
+            onStateChange: (e) => {
+              if (e.data === window.YT.PlayerState.PLAYING) {
+                this.player._handlePlay('youtube');
+              } else if (e.data === window.YT.PlayerState.PAUSED) {
+                this.player._handlePause('youtube');
+              } else if (e.data === window.YT.PlayerState.ENDED) {
+                this.player._handleEnded('youtube');
+              } else if (e.data === window.YT.PlayerState.BUFFERING) {
+                this.player.ui.showSpinner(true);
+              }
+            },
+            onError: (e) => {
+              let msg = 'YouTube playback failed.';
+              if (e.data === 101 || e.data === 150) {
+                msg = 'This video owner does not allow third-party embedded playback.';
+              } else if (e.data === 2) {
+                msg = 'Invalid YouTube video ID.';
+              } else if (e.data === 100) {
+                msg = 'YouTube video not found or removed.';
+              }
+              this.player.showError(msg);
+              resolve();
             }
-          },
-          onError: (e) => {
-            let msg = 'YouTube playback failed.';
-            if (e.data === 101 || e.data === 150) {
-              msg = 'This video does not allow playback in embedded players.';
-            }
-            this.player.showError(msg);
           }
-        }
-      });
+        });
+      } catch (err) {
+        console.warn('[LiQuPlayer] YT.Player instantiation error, using fallback iframe:', err);
+        mountNode.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="width:100%;height:100%;border:none;"></iframe>`;
+        resolve();
+      }
     });
   }
 

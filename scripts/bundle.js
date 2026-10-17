@@ -82,5 +82,16 @@ const bundle = banner + [
 
 fs.writeFileSync(rootFile, bundle, 'utf-8');
 fs.writeFileSync(distFile, bundle, 'utf-8');
-
 console.log(`[Build] Successfully compiled LiQuPlayer.js (${(bundle.length / 1024).toFixed(1)} KB)`);
+
+// Sync CSS files
+const cssSource = path.resolve(__dirname, '..', 'src', 'LiQuPlayer.css');
+const cssRoot = path.resolve(__dirname, '..', 'LiQuPlayer.css');
+const cssDist = path.resolve(__dirname, '..', 'dist', 'LiQuPlayer.css');
+if (fs.existsSync(cssSource)) {
+  const cssContent = fs.readFileSync(cssSource, 'utf-8');
+  fs.writeFileSync(cssRoot, cssContent, 'utf-8');
+  fs.writeFileSync(cssDist, cssContent, 'utf-8');
+  console.log(`[Build] Successfully synced LiQuPlayer.css (${(cssContent.length / 1024).toFixed(1)} KB)`);
+}
+
