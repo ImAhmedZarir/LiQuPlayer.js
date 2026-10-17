@@ -64,6 +64,7 @@
   align-items: center;
   justify-content: center;
   background: #000;
+  overflow: hidden;
 }
 
 .liqu-video-element {
@@ -80,14 +81,16 @@
   width: 100%;
   height: 100%;
   border: none;
-  pointer-events: none;
+  overflow: hidden;
 }
 
 .liqu-youtube-frame iframe,
 .liqu-vimeo-frame iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
 }
 
 /* ---- Controls Overlay Layer ---- */
@@ -192,12 +195,15 @@
   width: 100%;
   position: relative;
   z-index: 5;
+  gap: 10px;
 }
 
 .liqu-top-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .liqu-back-btn {
@@ -514,11 +520,13 @@
   position: absolute;
   top: 80px;
   right: 28px;
-  width: 250px;
+  width: 260px;
   padding: 16px;
   border-radius: 20px;
   pointer-events: auto;
   animation: liquFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: calc(100% - 100px);
+  overflow-y: auto;
 }
 
 @keyframes liquFadeIn {
@@ -610,6 +618,69 @@
   fill: #fff;
 }
 
+/* ---- Error Overlay UI ---- */
+.liqu-error-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 32px;
+  border-radius: 24px;
+  text-align: center;
+  z-index: 25;
+  background: rgba(24, 16, 20, 0.88);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(248, 113, 113, 0.35);
+  pointer-events: auto;
+}
+
+.liqu-error-icon svg {
+  width: 36px;
+  height: 36px;
+  stroke: #f87171;
+}
+
+.liqu-error-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f87171;
+}
+
+.liqu-error-msg {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 300px;
+  line-height: 1.45;
+}
+
+.liqu-error-retry {
+  margin-top: 6px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  cursor: pointer;
+}
+
+.liqu-error-retry svg {
+  width: 14px;
+  height: 14px;
+  stroke: #fff;
+}
+
+.liqu-error-retry:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
 /* Double-tap ripple effect */
 .liqu-double-tap-ripple {
   position: absolute;
@@ -685,128 +756,137 @@
 }
 
 /* =========================================================================
- * COMPACT & MOBILE ENGINE (Exact 1:1 Match to Uploaded Image 2)
- * Applies on real mobile viewports, compact containers, and device frames.
+ * COMPACT & MOBILE ENGINE (All Icons Present, Perfectly Sized & Arranged)
  * ========================================================================= */
 
-.liqu-player-container.liqu-compact-mode,
-.device-stage.mobile-view .liqu-player-container {
-  /* Scope wrapper */
-}
-
 .liqu-player-container.liqu-compact-mode .liqu-controls-overlay,
-.device-stage.mobile-view .liqu-player-container .liqu-controls-overlay,
-@container liquplayer (max-width: 680px) {
-  .liqu-controls-overlay {
-    padding: 12px 14px 10px !important;
-  }
+.device-stage.mobile-view .liqu-player-container .liqu-controls-overlay {
+  padding: 10px 12px 10px !important;
 }
 
-/* 1. HIDE Title Badge & Next Button completely on mobile to prevent any crowding */
-.liqu-player-container.liqu-compact-mode .liqu-title-badge,
-.device-stage.mobile-view .liqu-player-container .liqu-title-badge,
-.liqu-player-container.liqu-compact-mode .liqu-next-btn,
-.device-stage.mobile-view .liqu-player-container .liqu-next-btn {
-  display: none !important;
+/* Top bar: both Back button & Title badge present on left */
+.liqu-player-container.liqu-compact-mode .liqu-top-bar,
+.device-stage.mobile-view .liqu-player-container .liqu-top-bar {
+  gap: 6px !important;
 }
 
-/* 2. Distinctive Red Liquid Glass Back Button (Matching Image 2) */
+.liqu-player-container.liqu-compact-mode .liqu-top-left,
+.device-stage.mobile-view .liqu-player-container .liqu-top-left {
+  gap: 6px !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+/* Red liquid back button on mobile */
 .liqu-player-container.liqu-compact-mode .liqu-back-btn,
 .device-stage.mobile-view .liqu-player-container .liqu-back-btn {
-  width: 42px !important;
-  height: 42px !important;
+  width: 36px !important;
+  height: 36px !important;
   border-radius: 50% !important;
   background: linear-gradient(145deg, #ef4444 0%, #dc2626 100%) !important;
   box-shadow:
-    0 8px 24px rgba(220, 38, 38, 0.45),
+    0 6px 20px rgba(220, 38, 38, 0.45),
     inset 0 1.5px 2px rgba(255, 255, 255, 0.7),
     inset 0 -4px 10px rgba(0, 0, 0, 0.28),
     inset 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
   flex-shrink: 0 !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-back-btn svg,
 .device-stage.mobile-view .liqu-player-container .liqu-back-btn svg {
-  width: 18px !important;
-  height: 18px !important;
-  stroke: #ffffff !important;
+  width: 17px !important;
+  height: 17px !important;
 }
 
-/* 3. Compact Top-Right Liquid Action Dock */
+/* Compact Title Badge on mobile: Visible and fits gracefully */
+.liqu-player-container.liqu-compact-mode .liqu-title-badge,
+.device-stage.mobile-view .liqu-player-container .liqu-title-badge {
+  display: flex !important;
+  max-width: 120px !important;
+  height: 32px !important;
+  padding: 0 10px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  flex-shrink: 1 !important;
+}
+.liqu-player-container.liqu-compact-mode .liqu-title-sub,
+.device-stage.mobile-view .liqu-player-container .liqu-title-sub {
+  display: none !important;
+}
+
+/* Top-Right Dock on mobile: ALL 7 ICONS PRESENT! */
 .liqu-player-container.liqu-compact-mode .liqu-top-actions,
 .device-stage.mobile-view .liqu-player-container .liqu-top-actions {
-  padding: 4px 6px !important;
-  gap: 2px !important;
+  display: flex !important;
+  padding: 3px 6px !important;
+  gap: 1px !important;
   border-radius: 999px !important;
+  flex-shrink: 0 !important;
 }
-
-.liqu-player-container.liqu-compact-mode .liqu-vol-wrapper,
-.device-stage.mobile-view .liqu-player-container .liqu-vol-wrapper {
-  display: none !important; /* Hide volume slider on mobile; handled via swipe/hardware keys */
-}
-
 .liqu-player-container.liqu-compact-mode .liqu-top-actions .liqu-btn,
 .device-stage.mobile-view .liqu-player-container .liqu-top-actions .liqu-btn {
-  width: 32px !important;
-  height: 32px !important;
+  width: 28px !important;
+  height: 28px !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-top-actions .liqu-btn svg,
 .device-stage.mobile-view .liqu-player-container .liqu-top-actions .liqu-btn svg {
-  width: 16px !important;
-  height: 16px !important;
+  width: 15px !important;
+  height: 15px !important;
 }
 
-/* 4. Center 3 Liquid Glass Bubbles (Sized & Centered with Zero Overlap) */
+/* Center 3 controls */
 .liqu-player-container.liqu-compact-mode .liqu-center-controls,
 .device-stage.mobile-view .liqu-player-container .liqu-center-controls {
   position: absolute !important;
   top: 50% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
-  gap: 16px !important;
+  gap: 14px !important;
   z-index: 12 !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-play-btn.liqu-glass-orb,
 .device-stage.mobile-view .liqu-player-container .liqu-play-btn.liqu-glass-orb {
-  width: 64px !important;
-  height: 64px !important;
+  width: 62px !important;
+  height: 62px !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-play-btn svg,
 .device-stage.mobile-view .liqu-player-container .liqu-play-btn svg {
-  width: 26px !important;
-  height: 26px !important;
+  width: 24px !important;
+  height: 24px !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-seek-btn.liqu-glass-circle,
 .device-stage.mobile-view .liqu-player-container .liqu-seek-btn.liqu-glass-circle {
-  width: 44px !important;
-  height: 44px !important;
+  width: 42px !important;
+  height: 42px !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-seek-btn svg,
 .device-stage.mobile-view .liqu-player-container .liqu-seek-btn svg {
-  width: 22px !important;
-  height: 22px !important;
+  width: 20px !important;
+  height: 20px !important;
 }
 
-/* 5. Floating Bottom Dock (Exact Match to Image 2) */
+/* Hide next button on compact view to prevent overlapping center buttons */
+.liqu-player-container.liqu-compact-mode .liqu-next-btn,
+.device-stage.mobile-view .liqu-player-container .liqu-next-btn {
+  display: none !important;
+}
+
+/* Floating Bottom Dock on mobile */
 .liqu-player-container.liqu-compact-mode .liqu-bottom-dock,
 .device-stage.mobile-view .liqu-player-container .liqu-bottom-dock {
   position: absolute !important;
-  bottom: 12px !important;
-  left: 12px !important;
-  right: 12px !important;
-  width: calc(100% - 24px) !important;
+  bottom: 10px !important;
+  left: 10px !important;
+  right: 10px !important;
+  width: calc(100% - 20px) !important;
   max-width: none !important;
   margin: 0 !important;
-  padding: 8px 14px !important;
+  padding: 7px 14px !important;
   gap: 10px !important;
   border-radius: 999px !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-time-current,
 .liqu-player-container.liqu-compact-mode .liqu-time-remaining,
 .device-stage.mobile-view .liqu-player-container .liqu-time-current,
@@ -814,90 +894,66 @@
   font-size: 12px !important;
   font-weight: 700 !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-scrub-rail,
 .device-stage.mobile-view .liqu-player-container .liqu-scrub-rail {
   height: 4px !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-scrub-thumb,
 .device-stage.mobile-view .liqu-player-container .liqu-scrub-thumb {
   width: 14px !important;
   height: 14px !important;
   right: -7px !important;
 }
-
 .liqu-player-container.liqu-compact-mode .liqu-popover,
 .device-stage.mobile-view .liqu-player-container .liqu-popover {
-  top: 54px !important;
-  right: 12px !important;
-  width: 200px !important;
+  top: 50px !important;
+  right: 10px !important;
+  width: 220px !important;
   padding: 12px !important;
 }
 
-/* Global Media Query Fallback for real mobile screens */
-@media (max-width: 680px) {
-  .liqu-controls-overlay {
-    padding: 12px 14px 10px !important;
-  }
-  .liqu-title-badge,
-  .liqu-next-btn,
-  .liqu-vol-wrapper {
-    display: none !important;
-  }
+/* Container Queries for responsive player embed */
+@container liquplayer (max-width: 680px) {
+  .liqu-controls-overlay { padding: 10px 12px 10px !important; }
+  .liqu-top-bar { gap: 6px !important; }
+  .liqu-top-left { gap: 6px !important; min-width: 0 !important; flex: 1 1 auto !important; }
   .liqu-back-btn {
-    width: 42px !important;
-    height: 42px !important;
-    border-radius: 50% !important;
+    width: 36px !important; height: 36px !important; border-radius: 50% !important;
     background: linear-gradient(145deg, #ef4444 0%, #dc2626 100%) !important;
-    box-shadow: 0 8px 24px rgba(220, 38, 38, 0.45), inset 0 1.5px 2px rgba(255, 255, 255, 0.7), inset 0 -4px 10px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 6px 20px rgba(220, 38, 38, 0.45), inset 0 1.5px 2px rgba(255, 255, 255, 0.7), inset 0 -4px 10px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
+    flex-shrink: 0 !important;
   }
-  .liqu-back-btn svg {
-    width: 18px !important;
-    height: 18px !important;
+  .liqu-back-btn svg { width: 17px !important; height: 17px !important; }
+  .liqu-title-badge {
+    display: flex !important; max-width: 120px !important; height: 32px !important;
+    padding: 0 10px !important; font-size: 12.5px !important; font-weight: 600 !important;
+    overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important;
+    flex-shrink: 1 !important;
   }
+  .liqu-title-sub { display: none !important; }
   .liqu-top-actions {
-    padding: 4px 6px !important;
-    gap: 2px !important;
+    display: flex !important; padding: 3px 6px !important; gap: 1px !important;
+    border-radius: 999px !important; flex-shrink: 0 !important;
   }
-  .liqu-top-actions .liqu-btn {
-    width: 32px !important;
-    height: 32px !important;
-  }
-  .liqu-top-actions .liqu-btn svg {
-    width: 16px !important;
-    height: 16px !important;
-  }
+  .liqu-top-actions .liqu-btn { width: 28px !important; height: 28px !important; }
+  .liqu-top-actions .liqu-btn svg { width: 15px !important; height: 15px !important; }
   .liqu-center-controls {
-    position: absolute !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    gap: 16px !important;
+    position: absolute !important; top: 50% !important; left: 50% !important;
+    transform: translate(-50%, -50%) !important; gap: 14px !important; z-index: 12 !important;
   }
-  .liqu-play-btn.liqu-glass-orb {
-    width: 64px !important;
-    height: 64px !important;
-  }
-  .liqu-play-btn svg {
-    width: 26px !important;
-    height: 26px !important;
-  }
-  .liqu-seek-btn.liqu-glass-circle {
-    width: 44px !important;
-    height: 44px !important;
-  }
-  .liqu-seek-btn svg {
-    width: 22px !important;
-    height: 22px !important;
-  }
+  .liqu-play-btn.liqu-glass-orb { width: 62px !important; height: 62px !important; }
+  .liqu-play-btn svg { width: 24px !important; height: 24px !important; }
+  .liqu-seek-btn.liqu-glass-circle { width: 42px !important; height: 42px !important; }
+  .liqu-seek-btn svg { width: 20px !important; height: 20px !important; }
+  .liqu-next-btn { display: none !important; }
   .liqu-bottom-dock {
-    position: absolute !important;
-    bottom: 12px !important;
-    left: 12px !important;
-    right: 12px !important;
-    width: calc(100% - 24px) !important;
-    padding: 8px 14px !important;
-    margin: 0 !important;
+    position: absolute !important; bottom: 10px !important; left: 10px !important;
+    right: 10px !important; width: calc(100% - 20px) !important; max-width: none !important;
+    margin: 0 !important; padding: 7px 14px !important; gap: 10px !important;
+    border-radius: 999px !important;
   }
+  .liqu-time-current, .liqu-time-remaining { font-size: 12px !important; font-weight: 700 !important; }
+  .liqu-scrub-rail { height: 4px !important; }
+  .liqu-scrub-thumb { width: 14px !important; height: 14px !important; right: -7px !important; }
+  .liqu-popover { top: 50px !important; right: 10px !important; width: 220px !important; padding: 12px !important; }
 }

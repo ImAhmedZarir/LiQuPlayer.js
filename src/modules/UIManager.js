@@ -12,8 +12,10 @@ export class UIManager {
     this.container = player.container;
     this.opts = player.options;
     this.activeMenu = null;
+    this.activeMenuGlassInst = null;
     this.isScrubbing = false;
     this.showRemaining = true;
+    this.activeSubtitleTrack = -1; // -1 = Off
 
     this.buildDOM();
     this.bindEvents();
@@ -33,16 +35,33 @@ export class UIManager {
     this.mediaWrapper.className = 'liqu-media-wrapper';
     this.container.appendChild(this.mediaWrapper);
 
-    // Video element
+    // Video element - NO HARDCODED CROSSORIGIN!
     this.video = document.createElement('video');
     this.video.className = 'liqu-video-element';
     this.video.playsInline = true;
     this.video.setAttribute('webkit-playsinline', 'true');
-    this.video.crossOrigin = 'anonymous';
+    if (this.opts.crossOrigin) this.video.crossOrigin = this.opts.crossOrigin;
     if (this.opts.poster) this.video.poster = this.opts.poster;
     if (this.opts.autoplay) this.video.autoplay = true;
     if (this.opts.muted) this.video.muted = true;
     if (this.opts.loop) this.video.loop = true;
+
+    // Load initial subtitles tracks if present
+    if (Array.isArray(this.opts.subtitles)) {
+      this.opts.subtitles.forEach((sub, idx) => {
+        const track = document.createElement('track');
+        track.kind = sub.kind || 'subtitles';
+        track.label = sub.label || `Track ${idx + 1}`;
+        track.srclang = sub.srclang || 'en';
+        track.src = sub.src;
+        if (sub.default) {
+          track.default = true;
+          this.activeSubtitleTrack = idx;
+        }
+        this.video.appendChild(track);
+      });
+    }
+
     this.mediaWrapper.appendChild(this.video);
     this.player.video = this.video;
     this.player.mediaWrapper = this.mediaWrapper;
@@ -52,57 +71,93 @@ export class UIManager {
     this.controlsOverlay.className = 'liqu-controls-overlay';
     this.container.appendChild(this.controlsOverlay);
 
-    // Buffer spinner
+    // Spinner
     this.spinner = document.createElement('div');
     this.spinner.className = 'liqu-spinner-container liqu-glass-pill';
     this.spinner.innerHTML = icons.spinner;
     this.controlsOverlay.appendChild(this.spinner);
 
+    // Error Overlay (Issue #2)
+    this.errorOverlay = document.createElement('div');
+    this.errorOverlay.className = 'liqu-error-overlay liqu-glass-card';
+    this.errorOverlay.style.display = 'none';
+    this.errorOverlay.innerHTML = `
+      <div class="liqu-error-icon">${icons.alertCircle}</div>
+      <div class="liqu-error-title">Playback Error</div>
+      <div class="liqu-error-msg">The media could not be loaded.</div>
+      <button class="liqu-btn liqu-error-retry liqu-glass-pill">${icons.refresh} <span>Retry</span></button>
+    `;
+    this.controlsOverlay.appendChild(this.errorOverlay);
+    this.errorOverlay.querySelector('.liqu-error-retry').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.player.retry();
+    });
+
     // TOP BAR
     this.topBar = document.createElement('div');
     this.topBar.className = 'liqu-top-bar';
-    this.topBar.innerHTML = `
-      <div class="liqu-top-left">
-        <button class="liqu-btn liqu-glass-circle liqu-back-btn" title="Back" aria-label="Back">
-          ${icons.back}
-        </button>
-        <div class="liqu-title-badge liqu-glass-pill">
-          <span class="liqu-title-text">${this.opts.title || 'LiQu Player'}</span>
-          ${this.opts.subtitle ? `<span class="liqu-title-sub">${this.opts.subtitle}</span>` : ''}
-        </div>
-      </div>
-      <div class="liqu-top-right">
-        <div class="liqu-top-actions liqu-glass-pill">
-          <div class="liqu-vol-wrapper">
-            <button class="liqu-btn liqu-vol-btn" title="Volume / Mute" aria-label="Volume">
-              ${icons.volumeHigh}
-            </button>
-            <div class="liqu-vol-slider-popover liqu-glass-pill">
-              <input type="range" class="liqu-vol-slider" min="0" max="1" step="0.01" value="1">
-            </div>
+
+    const topLeft = document.createElement('div');
+    topLeft.className = 'liqu-top-left';
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'liqu-btn liqu-glass-circle liqu-back-btn';
+    backBtn.title = 'Back';
+    backBtn.setAttribute('aria-label', 'Back');
+    backBtn.innerHTML = icons.back;
+    topLeft.appendChild(backBtn);
+
+    // Title badge with safe textContent (Prevents XSS)
+    const titleBadge = document.createElement('div');
+    titleBadge.className = 'liqu-title-badge liqu-glass-pill';
+    const titleText = document.createElement('span');
+    titleText.className = 'liqu-title-text';
+    titleText.textContent = this.opts.title || 'LiQu Player';
+    titleBadge.appendChild(titleText);
+
+    if (this.opts.subtitle) {
+      const titleSub = document.createElement('span');
+      titleSub.className = 'liqu-title-sub';
+      titleSub.textContent = this.opts.subtitle;
+      titleBadge.appendChild(titleSub);
+    }
+    topLeft.appendChild(titleBadge);
+    this.topBar.appendChild(topLeft);
+
+    // Top Right Actions Dock (All 7 icons available on all devices)
+    const topRight = document.createElement('div');
+    topRight.className = 'liqu-top-right';
+    topRight.innerHTML = `
+      <div class="liqu-top-actions liqu-glass-pill">
+        <div class="liqu-vol-wrapper">
+          <button class="liqu-btn liqu-vol-btn" title="Volume / Mute" aria-label="Volume">
+            ${icons.volumeHigh}
+          </button>
+          <div class="liqu-vol-slider-popover liqu-glass-pill">
+            <input type="range" class="liqu-vol-slider" min="0" max="1" step="0.01" value="1">
           </div>
-          <button class="liqu-btn liqu-cc-btn" title="Subtitles" aria-label="Subtitles">
-            ${icons.subtitles}
-          </button>
-          <button class="liqu-btn liqu-speed-btn" title="Speed" aria-label="Playback Speed">
-            ${icons.speedometer}
-          </button>
-          <button class="liqu-btn liqu-settings-btn" title="Settings" aria-label="Settings">
-            ${icons.settings}
-          </button>
-          ${this.opts.downloadable !== false ? `
-          <button class="liqu-btn liqu-download-btn" title="Download" aria-label="Download">
-            ${icons.download}
-          </button>` : ''}
-          <button class="liqu-btn liqu-pip-btn" title="Picture in Picture" aria-label="Picture in Picture">
-            ${icons.pip}
-          </button>
-          <button class="liqu-btn liqu-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">
-            ${icons.fullscreen}
-          </button>
         </div>
+        <button class="liqu-btn liqu-cc-btn" title="Subtitles" aria-label="Subtitles">
+          ${icons.subtitles}
+        </button>
+        <button class="liqu-btn liqu-speed-btn" title="Speed" aria-label="Playback Speed">
+          ${icons.speedometer}
+        </button>
+        <button class="liqu-btn liqu-settings-btn" title="Settings" aria-label="Settings">
+          ${icons.settings}
+        </button>
+        <button class="liqu-btn liqu-download-btn" title="Download" aria-label="Download">
+          ${icons.download}
+        </button>
+        <button class="liqu-btn liqu-pip-btn" title="Picture in Picture" aria-label="Picture in Picture">
+          ${icons.pip}
+        </button>
+        <button class="liqu-btn liqu-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">
+          ${icons.fullscreen}
+        </button>
       </div>
     `;
+    this.topBar.appendChild(topRight);
     this.controlsOverlay.appendChild(this.topBar);
 
     // CENTER CONTROLS (Floating Liquid Glass Bubbles)
@@ -180,8 +235,9 @@ export class UIManager {
     this.scrubProgress = this.bottomDock.querySelector('.liqu-scrub-progress');
     this.scrubBuffer = this.bottomDock.querySelector('.liqu-scrub-buffer');
     this.scrubTooltip = this.bottomDock.querySelector('.liqu-scrub-tooltip');
+    this.player.downloadBtn = this.downloadBtn;
 
-    // Apply liquid glass engine to all glass elements
+    // Apply liquid glass engine
     this.applyLiquidMaterials();
 
     // Automatic Compact / Mobile Responsive Detection
@@ -202,15 +258,11 @@ export class UIManager {
     const le = this.player.liquidEngine;
     if (!le) return;
 
-    // Apply spherical droplet lens to center play button (Orb)
     le.apply(this.playBtn, { isOrb: true, scale: -140, chroma: 8, border: 0.04, mapBlur: 14 });
-
-    // Circular glass buttons
     le.apply(this.seekBackBtn, { radius: 36, scale: -95, chroma: 5, border: 0.08 });
     le.apply(this.seekFwdBtn, { radius: 36, scale: -95, chroma: 5, border: 0.08 });
     le.apply(this.backBtn, { radius: 24, scale: -85, chroma: 4, border: 0.09 });
 
-    // Glass pill docks
     const titleBadge = this.topBar.querySelector('.liqu-title-badge');
     const topActions = this.topBar.querySelector('.liqu-top-actions');
     if (titleBadge) le.apply(titleBadge, { radius: 22, scale: -75, chroma: 4, border: 0.06 });
@@ -223,13 +275,11 @@ export class UIManager {
   }
 
   bindEvents() {
-    // Play/Pause center button
     this.playBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.player.togglePlay();
     });
 
-    // Seek buttons
     this.seekBackBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.player.seekBy(-10);
@@ -239,14 +289,12 @@ export class UIManager {
       this.player.seekBy(10);
     });
 
-    // Back button
     this.backBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (this.opts.onBack) this.opts.onBack();
       else if (window.history.length > 1) window.history.back();
     });
 
-    // Volume button & slider
     this.volBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.player.toggleMute();
@@ -256,7 +304,6 @@ export class UIManager {
       this.player.setVolume(parseFloat(e.target.value));
     });
 
-    // Menus
     this.speedBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleMenu('speed');
@@ -270,7 +317,6 @@ export class UIManager {
       this.toggleMenu('subtitles');
     });
 
-    // Download button
     if (this.downloadBtn) {
       this.downloadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -278,7 +324,6 @@ export class UIManager {
       });
     }
 
-    // PiP & Fullscreen
     this.pipBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.player.togglePiP();
@@ -288,7 +333,6 @@ export class UIManager {
       this.player.toggleFullscreen();
     });
 
-    // Next Episode
     if (this.nextEpisodeBtn) {
       this.nextEpisodeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -298,21 +342,32 @@ export class UIManager {
       });
     }
 
-    // Time toggle (current / remaining)
     this.timeRemaining.addEventListener('click', (e) => {
       e.stopPropagation();
       this.showRemaining = !this.showRemaining;
       this.updateProgress();
     });
 
-    // Scrubbing on seek bar
     this.bindScrubberEvents();
 
-    // Close menu on container click
     this.container.addEventListener('click', (e) => {
       if (!e.target.closest('.liqu-popover') && !e.target.closest('.liqu-btn')) {
         this.closeMenu();
       }
+    });
+
+    // Native video error listener
+    this.video.addEventListener('error', (e) => {
+      const err = this.video.error;
+      let msg = 'Playback failed.';
+      if (err) {
+        if (err.code === 1) msg = 'Playback was aborted.';
+        else if (err.code === 2) msg = 'Network connection failed.';
+        else if (err.code === 3) msg = 'Video decode error.';
+        else if (err.code === 4) msg = 'Video format not supported or cross-origin access denied.';
+      }
+      this.showError(msg);
+      this.player.emit('error', err || msg);
     });
   }
 
@@ -323,7 +378,6 @@ export class UIManager {
       const pos = clamp((clientX - rect.left) / rect.width, 0, 1);
       const targetTime = pos * this.player.getDuration();
 
-      // Tooltip position & content
       this.scrubTooltip.style.left = `${pos * 100}%`;
       this.scrubTooltip.textContent = formatTime(targetTime);
       this.scrubTooltip.style.opacity = '1';
@@ -395,7 +449,6 @@ export class UIManager {
       this.timeRemaining.textContent = formatTime(duration);
     }
 
-    // Buffer update
     const buffered = this.player.getBuffered();
     if (buffered && buffered.length) {
       const bufEnd = buffered.end(buffered.length - 1);
@@ -427,6 +480,16 @@ export class UIManager {
     this.spinner.style.display = show ? 'flex' : 'none';
   }
 
+  showError(msg) {
+    this.showSpinner(false);
+    this.errorOverlay.querySelector('.liqu-error-msg').textContent = msg;
+    this.errorOverlay.style.display = 'flex';
+  }
+
+  hideError() {
+    this.errorOverlay.style.display = 'none';
+  }
+
   showHUD(iconSvg, text) {
     this.hudPill.querySelector('.liqu-hud-icon').innerHTML = iconSvg;
     this.hudPill.querySelector('.liqu-hud-text').textContent = text;
@@ -455,10 +518,12 @@ export class UIManager {
       popover.innerHTML = this.renderSettingsMenu();
     } else if (type === 'subtitles') {
       popover.innerHTML = this.renderSubtitlesMenu();
+    } else if (type === 'quality') {
+      popover.innerHTML = this.renderQualityMenu();
     }
 
     this.popoverContainer.appendChild(popover);
-    this.player.liquidEngine.apply(popover, { radius: 20, scale: -75, chroma: 4, border: 0.06 });
+    this.activeMenuGlassInst = this.player.liquidEngine.apply(popover, { radius: 20, scale: -75, chroma: 4, border: 0.06 });
 
     this.bindMenuActions(popover, type);
   }
@@ -466,6 +531,11 @@ export class UIManager {
   closeMenu() {
     this.activeMenu = null;
     this.player.isMenuOpen = false;
+    // Destroy SVG filter to prevent filter leak (Issue #7)
+    if (this.activeMenuGlassInst) {
+      this.activeMenuGlassInst.destroy();
+      this.activeMenuGlassInst = null;
+    }
     this.popoverContainer.innerHTML = '';
   }
 
@@ -476,9 +546,9 @@ export class UIManager {
       <div class="liqu-menu-header">Playback Speed</div>
       <div class="liqu-menu-list">
         ${speeds.map(s => `
-          <button class="liqu-menu-item ${s === currentSpeed ? 'liqu-item-active' : ''}" data-speed="${s}">
+          <button class="liqu-menu-item ${Math.abs(s - currentSpeed) < 0.01 ? 'liqu-item-active' : ''}" data-speed="${s}">
             <span>${s === 1 ? '1.0x (Normal)' : `${s}x`}</span>
-            ${s === currentSpeed ? icons.check : ''}
+            ${Math.abs(s - currentSpeed) < 0.01 ? icons.check : ''}
           </button>
         `).join('')}
       </div>
@@ -489,6 +559,15 @@ export class UIManager {
     return `
       <div class="liqu-menu-header">Settings</div>
       <div class="liqu-menu-list">
+        <div class="liqu-menu-section-title">Video Quality</div>
+        <button class="liqu-menu-item" data-goto="quality">
+          <span>Quality</span>
+          <span style="display:flex;align-items:center;gap:4px;color:var(--liqu-ink-dim);">
+            ${this.getQualityLabel()} ${icons.chevronRight}
+          </span>
+        </button>
+
+        <div class="liqu-menu-divider"></div>
         <div class="liqu-menu-section-title">Liquid Glass Mode</div>
         <button class="liqu-menu-item ${this.player.liquidEngine.mode === 'ultra' ? 'liqu-item-active' : ''}" data-glass="ultra">
           <span>Ultra Fluid (Apple Refraction)</span>
@@ -518,18 +597,60 @@ export class UIManager {
     `;
   }
 
+  getQualityLabel() {
+    const cur = this.player.sourceManager.currentQualityIndex;
+    if (cur === -1) return 'Auto';
+    const qList = this.player.sourceManager.qualities;
+    if (qList && qList[cur]) return qList[cur].label;
+    return '1080p';
+  }
+
+  renderQualityMenu() {
+    const sm = this.player.sourceManager;
+    const curIdx = sm.currentQualityIndex;
+    let list = sm.qualities;
+    if (!list || !list.length) {
+      list = [
+        { label: '1080p (FHD)', index: 0 },
+        { label: '720p (HD)', index: 1 },
+        { label: '480p (SD)', index: 2 },
+        { label: '360p', index: 3 }
+      ];
+    }
+
+    return `
+      <div class="liqu-menu-header" style="display:flex;align-items:center;gap:8px;">
+        <button class="liqu-btn" data-goto="settings" style="width:24px;height:24px;">${icons.back}</button>
+        <span>Quality Selection</span>
+      </div>
+      <div class="liqu-menu-list">
+        <button class="liqu-menu-item ${curIdx === -1 ? 'liqu-item-active' : ''}" data-quality="-1">
+          <span>Auto (Recommended)</span>
+          ${curIdx === -1 ? icons.check : ''}
+        </button>
+        ${list.map(q => `
+          <button class="liqu-menu-item ${curIdx === q.index ? 'liqu-item-active' : ''}" data-quality="${q.index}">
+            <span>${q.label}</span>
+            ${curIdx === q.index ? icons.check : ''}
+          </button>
+        `).join('')}
+      </div>
+    `;
+  }
+
   renderSubtitlesMenu() {
     const tracks = this.opts.subtitles || [];
     return `
       <div class="liqu-menu-header">Subtitles / Captions</div>
       <div class="liqu-menu-list">
-        <button class="liqu-menu-item liqu-item-active" data-track="off">
+        <button class="liqu-menu-item ${this.activeSubtitleTrack === -1 ? 'liqu-item-active' : ''}" data-track="-1">
           <span>Off</span>
-          ${icons.check}
+          ${this.activeSubtitleTrack === -1 ? icons.check : ''}
         </button>
         ${tracks.map((t, idx) => `
-          <button class="liqu-menu-item" data-track="${idx}">
+          <button class="liqu-menu-item ${this.activeSubtitleTrack === idx ? 'liqu-item-active' : ''}" data-track="${idx}">
             <span>${t.label || t.language || `Track ${idx + 1}`}</span>
+            ${this.activeSubtitleTrack === idx ? icons.check : ''}
           </button>
         `).join('')}
       </div>
@@ -538,12 +659,22 @@ export class UIManager {
 
   bindMenuActions(popover, type) {
     popover.addEventListener('click', (e) => {
-      const btn = e.target.closest('.liqu-menu-item');
+      const btn = e.target.closest('.liqu-menu-item, [data-goto]');
       if (!btn) return;
+
+      if (btn.dataset.goto) {
+        this.toggleMenu(btn.dataset.goto);
+        return;
+      }
 
       if (type === 'speed' && btn.dataset.speed) {
         const speed = parseFloat(btn.dataset.speed);
         this.player.setPlaybackRate(speed);
+        this.closeMenu();
+      } else if (type === 'quality' && btn.dataset.quality) {
+        const qIdx = parseInt(btn.dataset.quality, 10);
+        this.player.sourceManager.setQuality(qIdx);
+        this.player.showHUD(icons.settings, `Quality: ${this.getQualityLabel()}`);
         this.closeMenu();
       } else if (type === 'settings') {
         if (btn.dataset.glass) {
@@ -556,10 +687,46 @@ export class UIManager {
           this.video.style.objectFit = btn.dataset.aspect;
           this.closeMenu();
         }
-      } else if (type === 'subtitles') {
+      } else if (type === 'subtitles' && btn.dataset.track) {
+        const trackIdx = parseInt(btn.dataset.track, 10);
+        this.setSubtitleTrack(trackIdx);
         this.closeMenu();
       }
     });
+  }
+
+  setSubtitleTrack(index) {
+    this.activeSubtitleTrack = index;
+    const v = this.video;
+    if (v.textTracks) {
+      for (let i = 0; i < v.textTracks.length; i++) {
+        v.textTracks[i].mode = (i === index) ? 'showing' : 'disabled';
+      }
+    }
+    const label = index === -1 ? 'Subtitles Off' : `Subtitles: Track ${index + 1}`;
+    this.showHUD(icons.subtitles, label);
+  }
+
+  setSubtitles(tracks) {
+    this.opts.subtitles = tracks || [];
+    if (!this.video) return;
+    const existing = this.video.querySelectorAll('track');
+    existing.forEach(t => t.remove());
+    this.activeSubtitleTrack = -1;
+    if (Array.isArray(tracks)) {
+      tracks.forEach((sub, idx) => {
+        const track = document.createElement('track');
+        track.kind = sub.kind || 'subtitles';
+        track.label = sub.label || `Track ${idx + 1}`;
+        track.srclang = sub.srclang || 'en';
+        track.src = sub.src;
+        if (sub.default) {
+          track.default = true;
+          this.activeSubtitleTrack = idx;
+        }
+        this.video.appendChild(track);
+      });
+    }
   }
 
   handleDownload() {
@@ -568,7 +735,7 @@ export class UIManager {
     if (url && (url.startsWith('http') || url.startsWith('blob'))) {
       const a = document.createElement('a');
       a.href = url;
-      a.download = this.opts.title || 'video.mp4';
+      a.download = (this.player.title || 'video').replace(/[^a-zA-Z0-9_-]/g, '_') + '.mp4';
       a.target = '_blank';
       document.body.appendChild(a);
       a.click();

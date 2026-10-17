@@ -14,6 +14,10 @@ export class SourceManager {
     this.ytPlayer = null;
     this.vimeoPlayer = null;
     this.testCanvasAnim = null;
+    this.vimeoDuration = 0;
+    this.vimeoCurrentTime = 0;
+    this.qualities = [];
+    this.currentQualityIndex = -1; // -1 = Auto
   }
 
   detectSourceType(src) {
@@ -26,48 +30,73 @@ export class SourceManager {
     if (/vimeo\.com/i.test(src)) return 'vimeo';
     if (/\.m3u8($|\?)/i.test(src) || src.includes('application/x-mpegURL')) return 'hls';
     if (/\.mpd($|\?)/i.test(src) || src.includes('application/dash+xml')) return 'dash';
-    if (/\.(mp4|webm|ogv|ogg|mov|m4v)($|\?)/i.test(src) || src.startsWith('blob:') || src.startsWith('data:')) return 'direct';
-    
     return 'direct';
   }
 
   async load(source) {
     this.unload();
     this.currentSource = source;
-    const url = typeof source === 'string' ? source : source.src;
+    const url = typeof source === 'string' ? source : (source ? source.src : '');
     this.sourceType = this.detectSourceType(url);
+    this.qualities = [];
+    this.currentQualityIndex = -1;
 
-    switch (this.sourceType) {
-      case 'youtube':
-        await this.loadYouTube(url);
-        break;
-      case 'vimeo':
-        await this.loadVimeo(url);
-        break;
-      case 'hls':
-        await this.loadHLS(url);
-        break;
-      case 'dash':
-        await this.loadDash(url);
-        break;
-      case 'test_pattern':
-        this.loadTestPattern();
-        break;
-      case 'direct':
-      default:
-        this.loadDirect(url);
-        break;
+    // Hide error overlay on new load
+    this.player.hideError();
+
+    // Toggle download button visibility (hide for YT, Vimeo, live stream)
+    const isEmbed = (this.sourceType === 'youtube' || this.sourceType === 'vimeo' || this.sourceType === 'test_pattern');
+    if (this.player.downloadBtn) {
+      this.player.downloadBtn.style.display = isEmbed ? 'none' : '';
     }
 
-    this.player.emit('sourceloaded', { type: this.sourceType, source });
+    try {
+      switch (this.sourceType) {
+        case 'youtube':
+          await this.loadYouTube(url);
+          break;
+        case 'vimeo':
+          await this.loadVimeo(url);
+          break;
+        case 'hls':
+          await this.loadHLS(url);
+          break;
+        case 'dash':
+          await this.loadDash(url);
+          break;
+        case 'test_pattern':
+          this.loadTestPattern();
+          break;
+        case 'direct':
+        default:
+          this.loadDirect(url);
+          break;
+      }
+      this.player.emit('sourceloaded', { type: this.sourceType, source });
+    } catch (err) {
+      console.error('[LiQuPlayer] Source load failed:', err);
+      this.player.showError('Could not load media source. Please verify URL or network.');
+    }
   }
 
   loadDirect(url) {
     const video = this.player.video;
     this.hideExternalFrames();
     video.style.display = 'block';
+
+    // DO NOT set crossOrigin by default — prevents CORS failure on external servers!
+    if (this.player.options.crossOrigin) {
+      video.crossOrigin = this.player.options.crossOrigin;
+    } else {
+      video.removeAttribute('crossorigin');
+    }
+
     video.src = url;
     video.load();
+
+    if (this.player.options.autoplay) {
+      video.play().catch(() => {});
+    }
   }
 
   async loadHLS(url) {
@@ -93,12 +122,32 @@ export class SourceManager {
       this.hlsInstance.attachMedia(video);
 
       this.hlsInstance.on(window.Hls.Events.MANIFEST_PARSED, (e, data) => {
-        const qualities = data.levels.map((l, index) => ({
-          label: `${l.height}p`,
+        this.qualities = data.levels.map((l, index) => ({
+          label: l.height ? `${l.height}p` : `${Math.round(l.bitrate / 1000)}k`,
+          height: l.height,
           bitrate: l.bitrate,
           index
         }));
-        this.player.emit('qualities', qualities);
+        this.player.emit('qualities', this.qualities);
+        if (this.player.options.autoplay) {
+          video.play().catch(() => {});
+        }
+      });
+
+      this.hlsInstance.on(window.Hls.Events.ERROR, (e, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case window.Hls.ErrorTypes.NETWORK_ERROR:
+              this.hlsInstance.startLoad();
+              break;
+            case window.Hls.ErrorTypes.MEDIA_ERROR:
+              this.hlsInstance.recoverMediaError();
+              break;
+            default:
+              this.player.showError('HLS fatal stream error.');
+              break;
+          }
+        }
       });
     } else {
       video.src = url;
@@ -116,7 +165,7 @@ export class SourceManager {
 
     if (window.dashjs) {
       this.dashInstance = window.dashjs.MediaPlayer().create();
-      this.dashInstance.initialize(video, url, false);
+      this.dashInstance.initialize(video, url, this.player.options.autoplay || false);
     } else {
       video.src = url;
     }
@@ -131,33 +180,49 @@ export class SourceManager {
   async loadYouTube(url) {
     const videoId = this.extractYouTubeId(url);
     if (!videoId) {
-      console.error('[LiQuPlayer] Invalid YouTube ID / URL:', url);
+      this.player.showError('Invalid YouTube URL or Video ID.');
       return;
     }
 
     this.player.video.style.display = 'none';
-    let ytContainer = this.player.container.querySelector('.liqu-youtube-frame');
-    if (!ytContainer) {
-      ytContainer = document.createElement('div');
-      ytContainer.className = 'liqu-youtube-frame';
-      this.player.mediaWrapper.insertBefore(ytContainer, this.player.video);
-    }
-    ytContainer.style.display = 'block';
 
+    // Wrapper preserves .liqu-youtube-frame class; mount node is replaced by iframe!
+    let ytWrapper = this.player.container.querySelector('.liqu-youtube-frame');
+    if (!ytWrapper) {
+      ytWrapper = document.createElement('div');
+      ytWrapper.className = 'liqu-youtube-frame';
+      this.player.mediaWrapper.insertBefore(ytWrapper, this.player.video);
+    }
+    ytWrapper.style.display = 'block';
+    ytWrapper.innerHTML = '<div class="liqu-yt-mount"></div>';
+    const mountNode = ytWrapper.querySelector('.liqu-yt-mount');
+
+    // Load YT IFrame API safely without race condition
     if (typeof window.YT === 'undefined' || !window.YT.Player) {
-      await this.loadScript('https://www.youtube.com/iframe_api');
       await new Promise(resolve => {
+        if (window.YT && window.YT.Player) return resolve();
         const prev = window.onYouTubeIframeAPIReady;
         window.onYouTubeIframeAPIReady = () => {
-          if (prev) prev();
+          if (typeof prev === 'function') prev();
           resolve();
         };
-        if (window.YT && window.YT.Player) resolve();
+        const poll = setInterval(() => {
+          if (window.YT && window.YT.Player) {
+            clearInterval(poll);
+            resolve();
+          }
+        }, 50);
+        this.loadScript('https://www.youtube.com/iframe_api').then(() => {
+          if (window.YT && window.YT.Player) {
+            clearInterval(poll);
+            resolve();
+          }
+        });
       });
     }
 
     return new Promise(resolve => {
-      this.ytPlayer = new window.YT.Player(ytContainer, {
+      this.ytPlayer = new window.YT.Player(mountNode, {
         videoId: videoId,
         playerVars: {
           autoplay: this.player.options.autoplay ? 1 : 0,
@@ -170,28 +235,40 @@ export class SourceManager {
           fs: 0
         },
         events: {
-          onReady: (e) => {
-            this.bridgeYouTubeEvents();
+          onReady: () => {
+            // Apply volume & rate settings once ready
+            try {
+              this.ytPlayer.setVolume(this.player.getVolume() * 100);
+              if (this.player.isMuted()) this.ytPlayer.mute();
+              this.ytPlayer.setPlaybackRate(this.player.getPlaybackRate());
+            } catch (_) {}
+            this.startYouTubeSync();
             resolve();
           },
           onStateChange: (e) => {
             if (e.data === window.YT.PlayerState.PLAYING) {
-              this.player.emit('play');
+              this.player._handlePlay('youtube');
             } else if (e.data === window.YT.PlayerState.PAUSED) {
-              this.player.emit('pause');
+              this.player._handlePause('youtube');
             } else if (e.data === window.YT.PlayerState.ENDED) {
-              this.player.emit('ended');
+              this.player._handleEnded('youtube');
             } else if (e.data === window.YT.PlayerState.BUFFERING) {
-              this.player.emit('waiting');
+              this.player.ui.showSpinner(true);
             }
+          },
+          onError: (e) => {
+            let msg = 'YouTube playback failed.';
+            if (e.data === 101 || e.data === 150) {
+              msg = 'This video does not allow playback in embedded players.';
+            }
+            this.player.showError(msg);
           }
         }
       });
     });
   }
 
-  bridgeYouTubeEvents() {
-    // Polling interval for time & buffer sync on YouTube iframe
+  startYouTubeSync() {
     clearInterval(this.ytTimer);
     this.ytTimer = setInterval(() => {
       if (!this.ytPlayer || !this.ytPlayer.getCurrentTime) return;
@@ -212,32 +289,37 @@ export class SourceManager {
       await this.loadScript('https://player.vimeo.com/api/player.js');
     }
 
-    let vimeoContainer = this.player.container.querySelector('.liqu-vimeo-frame');
-    if (!vimeoContainer) {
-      vimeoContainer = document.createElement('div');
-      vimeoContainer.className = 'liqu-vimeo-frame';
-      this.player.mediaWrapper.insertBefore(vimeoContainer, video);
+    let vimeoWrapper = this.player.container.querySelector('.liqu-vimeo-frame');
+    if (!vimeoWrapper) {
+      vimeoWrapper = document.createElement('div');
+      vimeoWrapper.className = 'liqu-vimeo-frame';
+      this.player.mediaWrapper.insertBefore(vimeoWrapper, video);
     }
-    vimeoContainer.style.display = 'block';
+    vimeoWrapper.style.display = 'block';
+    vimeoWrapper.innerHTML = '';
 
-    this.vimeoPlayer = new window.Vimeo.Player(vimeoContainer, {
+    this.vimeoPlayer = new window.Vimeo.Player(vimeoWrapper, {
       url: url,
       controls: false,
       autoplay: this.player.options.autoplay || false
     });
 
-    this.vimeoPlayer.on('play', () => this.player.emit('play'));
-    this.vimeoPlayer.on('pause', () => this.player.emit('pause'));
-    this.vimeoPlayer.on('ended', () => this.player.emit('ended'));
+    this.vimeoPlayer.on('play', () => this.player._handlePlay('vimeo'));
+    this.vimeoPlayer.on('pause', () => this.player._handlePause('vimeo'));
+    this.vimeoPlayer.on('ended', () => this.player._handleEnded('vimeo'));
     this.vimeoPlayer.on('timeupdate', (data) => {
+      this.vimeoCurrentTime = data.seconds || 0;
+      this.vimeoDuration = data.duration || 0;
       this.player.onTimeUpdateBridge(data.seconds, data.duration, data.percent);
+    });
+    this.vimeoPlayer.on('loaded', async () => {
+      this.vimeoDuration = await this.vimeoPlayer.getDuration();
+    });
+    this.vimeoPlayer.on('error', () => {
+      this.player.showError('Vimeo stream failed to load.');
     });
   }
 
-  /**
-   * Procedural test pattern generator (matching Image 2 & Image 3 SMPTE color bars)
-   * Runs offline with an animated diagonal laser line and timecode!
-   */
   loadTestPattern() {
     const video = this.player.video;
     this.hideExternalFrames();
@@ -250,35 +332,22 @@ export class SourceManager {
 
     const bars = ['#ff0000', '#00ff00', '#ffff00', '#0000ff', '#ff00ff', '#00ffff'];
     let startTime = Date.now();
-    let isPlaying = false;
     let offset = 0;
 
     const render = () => {
       const now = (Date.now() - startTime) / 1000;
-      // Draw SMPTE style 6 vertical bars
       const barW = canvas.width / bars.length;
       bars.forEach((color, i) => {
         ctx.fillStyle = color;
         ctx.fillRect(i * barW, 0, barW, canvas.height);
       });
 
-      // Draw crosshair + checkerboard test blocks
+      // Crosshair test pattern
       ctx.fillStyle = 'rgba(80, 80, 80, 0.7)';
       ctx.fillRect(180, 520, 240, 20);
       ctx.fillRect(290, 410, 20, 240);
 
-      // Checkerboard block
-      const checkW = 16;
-      for (let y = 460; y < 620; y += checkW) {
-        for (let x = 780; x < 1100; x += checkW) {
-          if ((Math.floor(x / checkW) + Math.floor(y / checkW)) % 2 === 0) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-            ctx.fillRect(x, y, checkW, checkW);
-          }
-        }
-      }
-
-      // Animated glowing diagonal laser line
+      // Moving laser beam
       ctx.save();
       ctx.beginPath();
       const lx = (offset * 120) % (canvas.width + 400) - 200;
@@ -290,7 +359,6 @@ export class SourceManager {
       ctx.lineTo(canvas.width + 100, canvas.height * 0.12);
       ctx.stroke();
 
-      // Moving laser beam point
       ctx.beginPath();
       ctx.arc(lx, canvas.height * 0.75 - (lx / canvas.width) * (canvas.height * 0.63), 12, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
@@ -299,7 +367,7 @@ export class SourceManager {
       ctx.fill();
       ctx.restore();
 
-      // Timecode overlay in top left
+      // Timecode
       ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
       ctx.fillRect(16, 16, 180, 48);
       ctx.fillStyle = '#ff2222';
@@ -308,7 +376,7 @@ export class SourceManager {
       const fakeFrames = Math.floor((now * 30) % 30);
       ctx.fillText(`00:00:${fakeSeconds < 10 ? '0' : ''}${fakeSeconds}.${fakeFrames < 10 ? '0' : ''}${fakeFrames}`, 26, 48);
 
-      if (isPlaying) {
+      if (this.player.isPlaying) {
         offset += 0.03;
         this.player.onTimeUpdateBridge(now % 39, 39, 1);
       }
@@ -319,6 +387,9 @@ export class SourceManager {
 
     if (canvas.captureStream) {
       video.srcObject = canvas.captureStream(30);
+      if (this.player.options.autoplay) {
+        video.play().catch(() => {});
+      }
     }
   }
 
@@ -333,8 +404,8 @@ export class SourceManager {
     return new Promise((resolve, reject) => {
       const existing = document.querySelector(`script[src="${src}"]`);
       if (existing) {
-        existing.addEventListener('load', resolve);
         if (existing.dataset.loaded) return resolve();
+        existing.addEventListener('load', resolve);
         return;
       }
       const script = document.createElement('script');
@@ -355,7 +426,9 @@ export class SourceManager {
     } else if (this.sourceType === 'vimeo' && this.vimeoPlayer) {
       this.vimeoPlayer.play();
     } else if (this.player.video) {
-      this.player.video.play().catch(() => {});
+      this.player.video.play().catch(err => {
+        console.warn('[LiQuPlayer] Autoplay prevented:', err);
+      });
     }
   }
 
@@ -374,6 +447,7 @@ export class SourceManager {
       this.ytPlayer.seekTo(seconds, true);
     } else if (this.sourceType === 'vimeo' && this.vimeoPlayer) {
       this.vimeoPlayer.setCurrentTime(seconds);
+      this.vimeoCurrentTime = seconds;
     } else if (this.player.video) {
       this.player.video.currentTime = seconds;
     }
@@ -411,7 +485,27 @@ export class SourceManager {
     }
   }
 
+  setQuality(index) {
+    this.currentQualityIndex = index;
+    if (this.hlsInstance) {
+      this.hlsInstance.currentLevel = index; // -1 = Auto
+    } else if (this.sourceType === 'youtube' && this.ytPlayer && this.ytPlayer.setPlaybackQuality) {
+      const qMap = { 0: 'highres', 1: 'hd1080', 2: 'hd720', 3: 'large', 4: 'medium', '-1': 'default' };
+      this.ytPlayer.setPlaybackQuality(qMap[index] || 'default');
+    }
+    this.player.emit('qualitychange', index);
+  }
+
   unload() {
+    // 1. Explicitly stop and unload native video
+    if (this.player.video) {
+      this.player.video.pause();
+      this.player.video.removeAttribute('src');
+      this.player.video.srcObject = null;
+      try { this.player.video.load(); } catch (_) {}
+    }
+
+    // 2. Clear HLS & DASH
     if (this.hlsInstance) {
       this.hlsInstance.destroy();
       this.hlsInstance = null;
@@ -420,6 +514,8 @@ export class SourceManager {
       this.dashInstance.reset();
       this.dashInstance = null;
     }
+
+    // 3. Clear YouTube timer & instance
     if (this.ytTimer) {
       clearInterval(this.ytTimer);
       this.ytTimer = null;
@@ -428,17 +524,21 @@ export class SourceManager {
       try { this.ytPlayer.destroy(); } catch (_) {}
       this.ytPlayer = null;
     }
+
+    // 4. Clear Vimeo
     if (this.vimeoPlayer) {
       try { this.vimeoPlayer.destroy(); } catch (_) {}
       this.vimeoPlayer = null;
     }
+
+    // 5. Clear procedural canvas
     if (this.testCanvasAnim) {
       cancelAnimationFrame(this.testCanvasAnim);
       this.testCanvasAnim = null;
     }
-    if (this.player.video) {
-      this.player.video.removeAttribute('src');
-      this.player.video.srcObject = null;
-    }
+
+    this.hideExternalFrames();
+    this.vimeoDuration = 0;
+    this.vimeoCurrentTime = 0;
   }
 }

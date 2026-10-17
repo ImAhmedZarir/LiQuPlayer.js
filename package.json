@@ -6,8 +6,9 @@
   "module": "src/LiQuPlayer.js",
   "style": "LiQuPlayer.css",
   "scripts": {
+    "build": "node scripts/bundle.js",
     "start": "npx serve .",
-    "test": "echo \"Ready for testing\""
+    "test": "node scripts/bundle.js"
   },
   "repository": {
     "type": "git",

@@ -52,24 +52,20 @@ export class LiquidEngine {
     return sharedSvgDefs;
   }
 
-  /**
-   * Generates a displacement map. Cached by dimensions to save memory.
-   */
   getMap(w, h, radius, border, mapBlur, isSpherical = false) {
-    const key = `${w}_${h}_${radius}_${border}_${mapBlur}_${isSpherical ? 'sphere' : 'rect'}`;
+    const key = `${w}_${h}_${radius}_${border}_${mapBlur}_${isSpherical ? 's' : 'r'}`;
     if (mapCache.has(key)) {
       return mapCache.get(key);
     }
 
     const canvas = document.createElement("canvas");
-    canvas.width = Math.min(w, 400); // capped for performance
-    canvas.height = Math.min(h, 400);
+    canvas.width = Math.min(w, 360);
+    canvas.height = Math.min(h, 360);
     const scaleX = canvas.width / w;
     const scaleY = canvas.height / h;
     const ctx = canvas.getContext("2d");
 
     if (isSpherical) {
-      // Spherical lens displacement map for circular orbs
       const cw = canvas.width;
       const ch = canvas.height;
       const imgData = ctx.createImageData(cw, ch);
@@ -86,18 +82,16 @@ export class LiquidEngine {
           const dist = Math.sqrt(dx * dx + dy * dy);
 
           if (dist < r) {
-            // Normal sphere refraction formula
             const norm = dist / r;
             const factor = Math.sin(norm * Math.PI) * 128;
             const dirX = norm > 0 ? (dx / dist) : 0;
             const dirY = norm > 0 ? (dy / dist) : 0;
             
-            data[idx] = Math.floor(128 + dirX * factor);     // Red = X shift
-            data[idx + 1] = 128;                             // Green = Neutral
-            data[idx + 2] = Math.floor(128 + dirY * factor); // Blue = Y shift
+            data[idx] = Math.floor(128 + dirX * factor);
+            data[idx + 1] = 128;
+            data[idx + 2] = Math.floor(128 + dirY * factor);
             data[idx + 3] = 255;
           } else {
-            // Neutral outside
             data[idx] = 128;
             data[idx + 1] = 128;
             data[idx + 2] = 128;
@@ -107,7 +101,6 @@ export class LiquidEngine {
       }
       ctx.putImageData(imgData, 0, 0);
     } else {
-      // Rounded pill / rect gradient difference map
       const cw = canvas.width;
       const ch = canvas.height;
       const gx = ctx.createLinearGradient(0, 0, cw, 0);
@@ -139,8 +132,7 @@ export class LiquidEngine {
     }
 
     const dataUrl = canvas.toDataURL("image/png");
-    // Limit cache size to 40 entries to keep RAM ultra low
-    if (mapCache.size > 40) {
+    if (mapCache.size > 30) {
       const firstKey = mapCache.keys().next().value;
       mapCache.delete(firstKey);
     }
@@ -204,14 +196,11 @@ export class LiquidEngine {
     return { filter, feImage };
   }
 
-  /**
-   * Apply liquid glass to any element with full spring dynamics and cursor glare
-   */
   apply(el, options = {}) {
     if (!el) return null;
 
     const opts = Object.assign({
-      scale: options.isOrb ? -140 : -100,
+      scale: options.isOrb ? -140 : -95,
       chroma: 7,
       border: options.isOrb ? 0.04 : 0.08,
       mapBlur: 10,
@@ -222,13 +211,15 @@ export class LiquidEngine {
       isOrb: false
     }, options);
 
-    const useUltra = (this.mode === 'ultra' && this.isSupported);
-    const useBalanced = (this.mode === 'balanced' || !this.isSupported);
+    // Determine mode accurately
+    const isLite = (this.mode === 'lite');
+    const isUltra = (!isLite && this.mode === 'ultra' && this.isSupported);
+    const isBalanced = (!isLite && !isUltra);
 
     let parts = null;
     let filterId = null;
 
-    if (useUltra) {
+    if (isUltra) {
       filterId = `liqu-filter-${++uid}`;
       const scales = [opts.scale, opts.scale + opts.chroma, opts.scale + 2 * opts.chroma];
       parts = this.buildFilter(filterId, scales);
@@ -239,7 +230,7 @@ export class LiquidEngine {
       const h = el.offsetHeight;
       if (!w || !h) return;
 
-      if (useUltra && parts) {
+      if (isUltra && parts) {
         const computedRadius = opts.radius != null ? opts.radius : (Math.min(w, h) / 2);
         const mapUrl = this.getMap(w, h, computedRadius, opts.border, opts.mapBlur, opts.isOrb);
         parts.feImage.setAttribute("href", mapUrl);
@@ -248,23 +239,23 @@ export class LiquidEngine {
       }
     };
 
-    // Apply backdrop filter
-    if (useUltra) {
-      el.style.backdropFilter = `url(#${filterId}) blur(${opts.blur}px) saturate(${opts.saturate})`;
-      el.style.webkitBackdropFilter = `url(#${filterId}) blur(${opts.blur}px) saturate(${opts.saturate})`;
-    } else if (useBalanced) {
-      el.style.backdropFilter = `blur(${opts.fallbackBlur}px) saturate(${opts.saturate})`;
-      el.style.webkitBackdropFilter = `blur(${opts.fallbackBlur}px) saturate(${opts.saturate})`;
-    } else {
-      // Lite mode
+    // Clean any previous mode classes
+    el.classList.remove("liqu-glass-lite");
+
+    if (isLite) {
       el.style.backdropFilter = `blur(8px)`;
       el.style.webkitBackdropFilter = `blur(8px)`;
       el.classList.add("liqu-glass-lite");
+    } else if (isUltra) {
+      el.style.backdropFilter = `url(#${filterId}) blur(${opts.blur}px) saturate(${opts.saturate})`;
+      el.style.webkitBackdropFilter = `url(#${filterId}) blur(${opts.blur}px) saturate(${opts.saturate})`;
+    } else {
+      el.style.backdropFilter = `blur(${opts.fallbackBlur}px) saturate(${opts.saturate})`;
+      el.style.webkitBackdropFilter = `blur(${opts.fallbackBlur}px) saturate(${opts.saturate})`;
     }
 
     refresh();
 
-    // Cursor tracked glare highlight
     const onPointerMove = (e) => {
       const rect = el.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
@@ -274,18 +265,7 @@ export class LiquidEngine {
       el.style.setProperty("--gy", `${gy.toFixed(1)}%`);
     };
 
-    // Elastic jelly click squash-and-stretch
-    const onPointerDown = () => {
-      el.classList.add("liqu-active-squash");
-    };
-    const onPointerUp = () => {
-      el.classList.remove("liqu-active-squash");
-    };
-
     el.addEventListener("pointermove", onPointerMove, { passive: true });
-    el.addEventListener("pointerdown", onPointerDown, { passive: true });
-    el.addEventListener("pointerup", onPointerUp, { passive: true });
-    el.addEventListener("pointerleave", onPointerUp, { passive: true });
 
     let resizeTimer = null;
     let ro = null;
@@ -299,15 +279,17 @@ export class LiquidEngine {
 
     const instance = {
       el,
+      options: opts, // Preserved for setMode()
       refresh,
       destroy: () => {
         if (ro) ro.disconnect();
         clearTimeout(resizeTimer);
         el.removeEventListener("pointermove", onPointerMove);
-        el.removeEventListener("pointerdown", onPointerDown);
-        el.removeEventListener("pointerup", onPointerUp);
-        el.removeEventListener("pointerleave", onPointerUp);
-        if (parts && parts.filter) parts.filter.remove();
+        el.classList.remove("liqu-glass-lite");
+        if (parts && parts.filter) {
+          parts.filter.remove();
+          parts = null;
+        }
         el.style.backdropFilter = "";
         el.style.webkitBackdropFilter = "";
         this.instances.delete(instance);
@@ -321,12 +303,13 @@ export class LiquidEngine {
   setMode(newMode) {
     if (this.mode === newMode) return;
     this.mode = newMode;
-    // Refresh all instances with new mode
+    // Re-apply using stored per-element options!
     const oldInstances = Array.from(this.instances);
     oldInstances.forEach(inst => {
       const el = inst.el;
+      const opts = inst.options;
       inst.destroy();
-      this.apply(el);
+      this.apply(el, opts);
     });
   }
 
