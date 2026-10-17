@@ -54,6 +54,10 @@
   - Droplet surface ripple on click/tap.
 - **System MediaSession Integration**:
   - Full synchronization with iOS/Android lock screens, Windows Volume HUD, and macOS Now Playing menu.
+- **Custom Frosted Liquid Glass Context Menu**:
+  - Right-click anywhere on the player to open an authentic liquid glass context menu with player version, engine diagnostics, copy URL, PiP toggle, and cinema glow.
+  - Native browser context menu disabled; underlying YouTube/Vimeo embed pointer clicks intercepted 100%.
+- **First-Class TypeScript Support**: Full type definitions (`LiQuPlayer.d.ts`) included directly in the npm package out-of-the-box.
 - **Dynamic Cinema Ambient Glow**:
   - Real-time video canvas sampling projects a reactive ambient light field around the player.
 - **Cross-Platform Ready**:

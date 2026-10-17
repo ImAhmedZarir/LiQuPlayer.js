@@ -134,8 +134,8 @@ export class LiQuPlayer {
   _handlePlay(source) {
     this.isPlaying = true;
     if (this.ui) {
-      this.ui.playIcon.style.display = 'none';
-      this.ui.pauseIcon.style.display = 'block';
+      this.ui.showSpinner(false);
+      this.ui.updatePlayState(true);
     }
     if (this.gestureManager) {
       this.gestureManager.onActivity();
@@ -149,8 +149,8 @@ export class LiQuPlayer {
   _handlePause(source) {
     this.isPlaying = false;
     if (this.ui) {
-      this.ui.playIcon.style.display = 'block';
-      this.ui.pauseIcon.style.display = 'none';
+      this.ui.showSpinner(false);
+      this.ui.updatePlayState(false);
     }
     if (this.gestureManager) {
       this.gestureManager.showControls();
@@ -164,8 +164,8 @@ export class LiQuPlayer {
   _handleEnded(source) {
     this.isPlaying = false;
     if (this.ui) {
-      this.ui.playIcon.style.display = 'block';
-      this.ui.pauseIcon.style.display = 'none';
+      this.ui.showSpinner(false);
+      this.ui.updatePlayState(false);
     }
     if (this.gestureManager) {
       this.gestureManager.showControls();
@@ -208,6 +208,18 @@ export class LiQuPlayer {
         }
         return;
       }
+    }
+    if (sm && sm.sourceType === 'youtube' && sm.ytPlayer) {
+      try {
+        const state = (typeof sm.ytPlayer.getPlayerState === 'function') ? sm.ytPlayer.getPlayerState() : -1;
+        if (state === 1) { // 1 = YT.PlayerState.PLAYING
+          this.pause();
+          return;
+        } else {
+          this.play();
+          return;
+        }
+      } catch (_) {}
     }
     if (this.isPlaying) this.pause();
     else this.play();
@@ -327,9 +339,15 @@ export class LiQuPlayer {
     }
   }
 
-  toggleFloatingMode(force) {
+  async toggleFloatingMode(force) {
     const isFloating = force !== undefined ? force : !this.container.classList.contains('liqu-floating-pip');
     if (isFloating) {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        try {
+          if (document.exitFullscreen) await document.exitFullscreen();
+          else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        } catch (_) {}
+      }
       this.container.classList.add('liqu-floating-pip');
       this.showHUD(icons.pip, 'Floating Miniplayer');
       this.emit('floatingchange', true);
@@ -346,7 +364,7 @@ export class LiQuPlayer {
 
     // For embeds or browsers without native PiP support, trigger liquid floating miniplayer
     if (isEmbed || !document.pictureInPictureEnabled || !this.video) {
-      this.toggleFloatingMode();
+      await this.toggleFloatingMode();
       return;
     }
 

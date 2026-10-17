@@ -1,18 +1,21 @@
 {
   "name": "liquplayer",
   "version": "1.0.0",
-  "description": "Powerful open-source liquid glass video player with authentic optical rim refraction, universal streaming engine, and low-RAM hardware optimization.",
+  "description": "Powerful, modern open-source liquid glass video player with authentic optical refraction, chromatic rim dispersion, universal streaming engine (HLS, DASH, YouTube, Vimeo, Direct MP4/WebM), floating miniplayer, and low-RAM hardware optimization for web, desktop, and mobile.",
   "main": "LiQuPlayer.js",
   "module": "src/LiQuPlayer.js",
+  "types": "LiQuPlayer.d.ts",
   "style": "LiQuPlayer.css",
   "files": [
     "LiQuPlayer.js",
     "LiQuPlayer.css",
+    "LiQuPlayer.d.ts",
     "dist",
     "src"
   ],
   "exports": {
     ".": {
+      "types": "./LiQuPlayer.d.ts",
       "import": "./src/LiQuPlayer.js",
       "require": "./LiQuPlayer.js"
     },
@@ -30,17 +33,28 @@
   },
   "keywords": [
     "video-player",
+    "liquplayer",
     "liquid-glass",
+    "liquid-glass-ui",
     "html5-video",
+    "videojs-alternative",
     "hls",
+    "hlsjs",
     "mpeg-dash",
-    "youtube",
-    "vimeo",
+    "dashjs",
+    "youtube-player",
+    "vimeo-player",
     "optical-refraction",
     "chromatic-aberration",
     "glassmorphism",
     "apple-glass",
-    "media-player"
+    "media-player",
+    "pip",
+    "miniplayer",
+    "subtitles",
+    "captions",
+    "ambient-glow",
+    "responsive-video-player"
   ],
   "author": "Ahmed Zarir <im.ahmedzarir@gmail.com>",
   "license": "MIT",

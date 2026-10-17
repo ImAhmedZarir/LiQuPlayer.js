@@ -289,6 +289,7 @@ export class SourceManager {
           },
           events: {
             onReady: () => {
+              if (this.player.ui) this.player.ui.showSpinner(false);
               // Apply volume & rate settings once ready
               try {
                 this.ytPlayer.setVolume(this.player.getVolume() * 100);
@@ -313,13 +314,18 @@ export class SourceManager {
             },
             onStateChange: (e) => {
               if (e.data === window.YT.PlayerState.PLAYING) {
+                if (this.player.ui) this.player.ui.showSpinner(false);
                 this.player._handlePlay('youtube');
               } else if (e.data === window.YT.PlayerState.PAUSED) {
+                if (this.player.ui) this.player.ui.showSpinner(false);
                 this.player._handlePause('youtube');
               } else if (e.data === window.YT.PlayerState.ENDED) {
+                if (this.player.ui) this.player.ui.showSpinner(false);
                 this.player._handleEnded('youtube');
               } else if (e.data === window.YT.PlayerState.BUFFERING) {
-                this.player.ui.showSpinner(true);
+                if (this.player.ui) this.player.ui.showSpinner(true);
+              } else if (e.data === window.YT.PlayerState.CUED) {
+                if (this.player.ui) this.player.ui.showSpinner(false);
               }
             },
             onError: (e) => {
@@ -380,9 +386,18 @@ export class SourceManager {
       autoplay: this.player.options.autoplay || false
     });
 
-    this.vimeoPlayer.on('play', () => this.player._handlePlay('vimeo'));
-    this.vimeoPlayer.on('pause', () => this.player._handlePause('vimeo'));
-    this.vimeoPlayer.on('ended', () => this.player._handleEnded('vimeo'));
+    this.vimeoPlayer.on('play', () => {
+      if (this.player.ui) this.player.ui.showSpinner(false);
+      this.player._handlePlay('vimeo');
+    });
+    this.vimeoPlayer.on('pause', () => {
+      if (this.player.ui) this.player.ui.showSpinner(false);
+      this.player._handlePause('vimeo');
+    });
+    this.vimeoPlayer.on('ended', () => {
+      if (this.player.ui) this.player.ui.showSpinner(false);
+      this.player._handleEnded('vimeo');
+    });
     this.vimeoPlayer.on('timeupdate', (data) => {
       this.vimeoCurrentTime = data.seconds || 0;
       this.vimeoDuration = data.duration || 0;

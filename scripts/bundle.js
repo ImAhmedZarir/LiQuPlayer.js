@@ -95,3 +95,12 @@ if (fs.existsSync(cssSource)) {
   console.log(`[Build] Successfully synced LiQuPlayer.css (${(cssContent.length / 1024).toFixed(1)} KB)`);
 }
 
+// Sync TypeScript definitions
+const dtsRoot = path.resolve(__dirname, '..', 'LiQuPlayer.d.ts');
+const dtsDist = path.resolve(__dirname, '..', 'dist', 'LiQuPlayer.d.ts');
+if (fs.existsSync(dtsRoot)) {
+  fs.copyFileSync(dtsRoot, dtsDist);
+  console.log(`[Build] Successfully synced LiQuPlayer.d.ts to dist/`);
+}
+
+

@@ -866,6 +866,7 @@ class SourceManager {
           },
           events: {
             onReady: () => {
+              if (this.player.ui) this.player.ui.showSpinner(false);
               // Apply volume & rate settings once ready
               try {
                 this.ytPlayer.setVolume(this.player.getVolume() * 100);
@@ -890,13 +891,18 @@ class SourceManager {
             },
             onStateChange: (e) => {
               if (e.data === window.YT.PlayerState.PLAYING) {
+                if (this.player.ui) this.player.ui.showSpinner(false);
                 this.player._handlePlay('youtube');
               } else if (e.data === window.YT.PlayerState.PAUSED) {
+                if (this.player.ui) this.player.ui.showSpinner(false);
                 this.player._handlePause('youtube');
               } else if (e.data === window.YT.PlayerState.ENDED) {
+                if (this.player.ui) this.player.ui.showSpinner(false);
                 this.player._handleEnded('youtube');
               } else if (e.data === window.YT.PlayerState.BUFFERING) {
-                this.player.ui.showSpinner(true);
+                if (this.player.ui) this.player.ui.showSpinner(true);
+              } else if (e.data === window.YT.PlayerState.CUED) {
+                if (this.player.ui) this.player.ui.showSpinner(false);
               }
             },
             onError: (e) => {
@@ -957,9 +963,18 @@ class SourceManager {
       autoplay: this.player.options.autoplay || false
     });
 
-    this.vimeoPlayer.on('play', () => this.player._handlePlay('vimeo'));
-    this.vimeoPlayer.on('pause', () => this.player._handlePause('vimeo'));
-    this.vimeoPlayer.on('ended', () => this.player._handleEnded('vimeo'));
+    this.vimeoPlayer.on('play', () => {
+      if (this.player.ui) this.player.ui.showSpinner(false);
+      this.player._handlePlay('vimeo');
+    });
+    this.vimeoPlayer.on('pause', () => {
+      if (this.player.ui) this.player.ui.showSpinner(false);
+      this.player._handlePause('vimeo');
+    });
+    this.vimeoPlayer.on('ended', () => {
+      if (this.player.ui) this.player.ui.showSpinner(false);
+      this.player._handleEnded('vimeo');
+    });
     this.vimeoPlayer.on('timeupdate', (data) => {
       this.vimeoCurrentTime = data.seconds || 0;
       this.vimeoDuration = data.duration || 0;
@@ -1261,6 +1276,8 @@ class UIManager {
     this.isScrubbing = false;
     this.showRemaining = true;
     this.activeSubtitleTrack = -1; // -1 = Off
+    this.contextMenu = null;
+    this.contextMenuGlassInst = null;
 
     this.buildDOM();
     this.bindEvents();
@@ -1308,6 +1325,12 @@ class UIManager {
     }
 
     this.mediaWrapper.appendChild(this.video);
+
+    // Click interceptor overlay: absorbs all pointer clicks over embedded iframes & media
+    this.clickInterceptor = document.createElement('div');
+    this.clickInterceptor.className = 'liqu-click-interceptor';
+    this.mediaWrapper.appendChild(this.clickInterceptor);
+
     this.player.video = this.video;
     this.player.mediaWrapper = this.mediaWrapper;
 
@@ -1613,7 +1636,16 @@ class UIManager {
 
     this.bindScrubberEvents();
 
+    // Click interceptor over iframe media to capture clicks & toggles
+    this.clickInterceptor.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeMenu();
+      this.closeContextMenu();
+      this.player.togglePlay();
+    });
+
     this.container.addEventListener('click', (e) => {
+      this.closeContextMenu();
       if (!e.target.closest('.liqu-popover') && !e.target.closest('.liqu-btn') && !e.target.closest('.liqu-bottom-dock') && !e.target.closest('.liqu-top-bar')) {
         this.closeMenu();
         this.player.togglePlay();
@@ -1622,14 +1654,38 @@ class UIManager {
       }
     });
 
+    // Custom Right-Click Liquid Glass Context Menu
+    this.container.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showContextMenu(e);
+    });
+
+    this._onDocClick = (e) => {
+      if (this.contextMenu && !this.contextMenu.contains(e.target)) {
+        this.closeContextMenu();
+      }
+    };
+    this._onDocKeydown = (e) => {
+      if (e.key === 'Escape') {
+        this.closeContextMenu();
+        this.closeMenu();
+      }
+    };
+    document.addEventListener('click', this._onDocClick);
+    document.addEventListener('keydown', this._onDocKeydown);
+
     // Native video lifecycle & state event listeners
     this.video.addEventListener('play', () => {
+      this.showSpinner(false);
       this.player._handlePlay('native');
     });
     this.video.addEventListener('pause', () => {
+      this.showSpinner(false);
       this.player._handlePause('native');
     });
     this.video.addEventListener('ended', () => {
+      this.showSpinner(false);
       this.player._handleEnded('native');
     });
     this.video.addEventListener('timeupdate', () => {
@@ -1647,17 +1703,31 @@ class UIManager {
     this.video.addEventListener('canplay', () => {
       this.showSpinner(false);
     });
+    this.video.addEventListener('canplaythrough', () => {
+      this.showSpinner(false);
+    });
+    this.video.addEventListener('loadeddata', () => {
+      this.showSpinner(false);
+    });
 
-    // Native video error listener
-    this.video.addEventListener('error', (e) => {
-      const err = this.video.error;
-      let msg = 'Playback failed.';
-      if (err) {
-        if (err.code === 1) msg = 'Playback was aborted.';
-        else if (err.code === 2) msg = 'Network connection failed.';
-        else if (err.code === 3) msg = 'Video decode error.';
-        else if (err.code === 4) msg = 'Video format not supported or cross-origin access denied.';
+    // Native video error listener (guarded against embeds & empty unloads)
+    this.video.addEventListener('error', () => {
+      const sm = this.player.sourceManager;
+      if (sm && (sm.sourceType === 'youtube' || sm.sourceType === 'vimeo' || sm.sourceType === 'test_pattern')) {
+        return;
       }
+      if (!this.video.currentSrc && !this.video.getAttribute('src')) {
+        return;
+      }
+      const err = this.video.error;
+      if (!err || (!this.video.src && err.code === 4)) {
+        return;
+      }
+      let msg = 'Playback failed.';
+      if (err.code === 1) msg = 'Playback was aborted.';
+      else if (err.code === 2) msg = 'Network connection failed.';
+      else if (err.code === 3) msg = 'Video decode error.';
+      else if (err.code === 4) msg = 'Video format not supported or cross-origin access denied.';
       this.showError(msg);
       this.player.emit('error', err || msg);
     });
@@ -2064,11 +2134,156 @@ class UIManager {
     }
   }
 
+  showContextMenu(e) {
+    this.closeMenu();
+    this.closeContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'liqu-context-menu liqu-glass-card';
+
+    const isGlowOn = this.player.ambientGlowEnabled;
+    const currentUrl = (this.player.sourceManager && this.player.sourceManager.currentSource)
+      ? (typeof this.player.sourceManager.currentSource === 'string' ? this.player.sourceManager.currentSource : this.player.sourceManager.currentSource.src)
+      : window.location.href;
+
+    menu.innerHTML = `
+      <div class="liqu-ctx-brand">
+        <div class="liqu-ctx-logo">${icons.play}</div>
+        <div class="liqu-ctx-info">
+          <div class="liqu-ctx-name">LiQu Player <span class="liqu-ctx-badge">v1.0.0</span></div>
+          <div class="liqu-ctx-desc">Liquid Glass Optical Engine</div>
+        </div>
+      </div>
+      <div class="liqu-menu-divider"></div>
+      <div class="liqu-ctx-items">
+        <button class="liqu-ctx-item" data-action="toggle-play">
+          <span class="liqu-ctx-item-icon">${this.player.isPlaying ? icons.pause : icons.play}</span>
+          <span>${this.player.isPlaying ? 'Pause' : 'Resume'}</span>
+          <span class="liqu-ctx-shortcut">Space</span>
+        </button>
+        <button class="liqu-ctx-item" data-action="toggle-pip">
+          <span class="liqu-ctx-item-icon">${icons.pip}</span>
+          <span>Picture-in-Picture / Float</span>
+          <span class="liqu-ctx-shortcut">P</span>
+        </button>
+        <button class="liqu-ctx-item" data-action="toggle-fullscreen">
+          <span class="liqu-ctx-item-icon">${icons.fullscreen}</span>
+          <span>Fullscreen</span>
+          <span class="liqu-ctx-shortcut">F</span>
+        </button>
+        <button class="liqu-ctx-item" data-action="toggle-glow">
+          <span class="liqu-ctx-item-icon">${icons.settings}</span>
+          <span>Ambient Cinema Glow</span>
+          <span class="liqu-ctx-toggle">${isGlowOn ? 'ON' : 'OFF'}</span>
+        </button>
+        <div class="liqu-menu-divider"></div>
+        <button class="liqu-ctx-item" data-action="copy-url">
+          <span class="liqu-ctx-item-icon">${icons.forward10}</span>
+          <span>Copy Media URL</span>
+        </button>
+        <button class="liqu-ctx-item" data-action="stats">
+          <span class="liqu-ctx-item-icon">${icons.speedometer}</span>
+          <span>Player Diagnostics</span>
+        </button>
+        <div class="liqu-menu-divider"></div>
+        <a class="liqu-ctx-item liqu-ctx-link" href="https://github.com/ImAhmedZarir/LiQuPlayer.js" target="_blank" rel="noopener noreferrer">
+          <span class="liqu-ctx-item-icon">${icons.check}</span>
+          <span>LiQu Player on GitHub</span>
+          <span class="liqu-ctx-shortcut">↗</span>
+        </a>
+      </div>
+    `;
+
+    this.controlsOverlay.appendChild(menu);
+    this.contextMenu = menu;
+
+    // Position relative to player container bounds
+    const rect = this.container.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+
+    const menuWidth = 240;
+    const menuHeight = 280;
+
+    if (x + menuWidth > rect.width) {
+      x = Math.max(10, rect.width - menuWidth - 10);
+    }
+    if (y + menuHeight > rect.height) {
+      y = Math.max(10, rect.height - menuHeight - 10);
+    }
+
+    menu.style.left = `${Math.max(10, x)}px`;
+    menu.style.top = `${Math.max(10, y)}px`;
+
+    // Liquid glass refraction for context menu
+    if (this.player.liquidEngine) {
+      this.contextMenuGlassInst = this.player.liquidEngine.apply(menu, {
+        radius: 18,
+        scale: -60,
+        chroma: 3,
+        border: 0.05
+      });
+    }
+
+    // Handle context menu clicks
+    menu.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const btn = ev.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'toggle-play') {
+        this.player.togglePlay();
+      } else if (action === 'toggle-pip') {
+        this.player.togglePiP();
+      } else if (action === 'toggle-fullscreen') {
+        this.player.toggleFullscreen();
+      } else if (action === 'toggle-glow') {
+        this.player.toggleAmbientGlow();
+      } else if (action === 'copy-url') {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(currentUrl).then(() => {
+            this.showHUD(icons.check, 'Media URL Copied');
+          }).catch(() => {});
+        } else {
+          this.showHUD(icons.check, 'Media URL Copied');
+        }
+      } else if (action === 'stats') {
+        const type = (this.player.sourceManager && this.player.sourceManager.sourceType) || 'direct';
+        const dur = Math.round(this.player.getDuration());
+        const cur = Math.round(this.player.getCurrentTime());
+        const glass = (this.player.liquidEngine && this.player.liquidEngine.mode) || 'ultra';
+        this.showHUD(icons.speedometer, `LiQu v1.0.0 | ${type.toUpperCase()} | ${glass} | ${cur}s/${dur}s`);
+      }
+      this.closeContextMenu();
+    });
+  }
+
+  closeContextMenu() {
+    if (this.contextMenuGlassInst) {
+      this.contextMenuGlassInst.destroy();
+      this.contextMenuGlassInst = null;
+    }
+    if (this.contextMenu) {
+      this.contextMenu.remove();
+      this.contextMenu = null;
+    }
+  }
+
   destroy() {
+    if (this._onDocClick) {
+      document.removeEventListener('click', this._onDocClick);
+      this._onDocClick = null;
+    }
+    if (this._onDocKeydown) {
+      document.removeEventListener('keydown', this._onDocKeydown);
+      this._onDocKeydown = null;
+    }
     if (this.compactRo) {
       this.compactRo.disconnect();
       this.compactRo = null;
     }
+    this.closeContextMenu();
     this.closeMenu();
     this.container.innerHTML = '';
   }
@@ -2550,8 +2765,8 @@ class LiQuPlayer {
   _handlePlay(source) {
     this.isPlaying = true;
     if (this.ui) {
-      this.ui.playIcon.style.display = 'none';
-      this.ui.pauseIcon.style.display = 'block';
+      this.ui.showSpinner(false);
+      this.ui.updatePlayState(true);
     }
     if (this.gestureManager) {
       this.gestureManager.onActivity();
@@ -2565,8 +2780,8 @@ class LiQuPlayer {
   _handlePause(source) {
     this.isPlaying = false;
     if (this.ui) {
-      this.ui.playIcon.style.display = 'block';
-      this.ui.pauseIcon.style.display = 'none';
+      this.ui.showSpinner(false);
+      this.ui.updatePlayState(false);
     }
     if (this.gestureManager) {
       this.gestureManager.showControls();
@@ -2580,8 +2795,8 @@ class LiQuPlayer {
   _handleEnded(source) {
     this.isPlaying = false;
     if (this.ui) {
-      this.ui.playIcon.style.display = 'block';
-      this.ui.pauseIcon.style.display = 'none';
+      this.ui.showSpinner(false);
+      this.ui.updatePlayState(false);
     }
     if (this.gestureManager) {
       this.gestureManager.showControls();
@@ -2624,6 +2839,18 @@ class LiQuPlayer {
         }
         return;
       }
+    }
+    if (sm && sm.sourceType === 'youtube' && sm.ytPlayer) {
+      try {
+        const state = (typeof sm.ytPlayer.getPlayerState === 'function') ? sm.ytPlayer.getPlayerState() : -1;
+        if (state === 1) { // 1 = YT.PlayerState.PLAYING
+          this.pause();
+          return;
+        } else {
+          this.play();
+          return;
+        }
+      } catch (_) {}
     }
     if (this.isPlaying) this.pause();
     else this.play();
@@ -2743,9 +2970,15 @@ class LiQuPlayer {
     }
   }
 
-  toggleFloatingMode(force) {
+  async toggleFloatingMode(force) {
     const isFloating = force !== undefined ? force : !this.container.classList.contains('liqu-floating-pip');
     if (isFloating) {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        try {
+          if (document.exitFullscreen) await document.exitFullscreen();
+          else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        } catch (_) {}
+      }
       this.container.classList.add('liqu-floating-pip');
       this.showHUD(icons.pip, 'Floating Miniplayer');
       this.emit('floatingchange', true);
@@ -2762,7 +2995,7 @@ class LiQuPlayer {
 
     // For embeds or browsers without native PiP support, trigger liquid floating miniplayer
     if (isEmbed || !document.pictureInPictureEnabled || !this.video) {
-      this.toggleFloatingMode();
+      await this.toggleFloatingMode();
       return;
     }
 

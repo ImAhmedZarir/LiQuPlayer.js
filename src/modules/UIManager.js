@@ -16,6 +16,8 @@ export class UIManager {
     this.isScrubbing = false;
     this.showRemaining = true;
     this.activeSubtitleTrack = -1; // -1 = Off
+    this.contextMenu = null;
+    this.contextMenuGlassInst = null;
 
     this.buildDOM();
     this.bindEvents();
@@ -63,6 +65,12 @@ export class UIManager {
     }
 
     this.mediaWrapper.appendChild(this.video);
+
+    // Click interceptor overlay: absorbs all pointer clicks over embedded iframes & media
+    this.clickInterceptor = document.createElement('div');
+    this.clickInterceptor.className = 'liqu-click-interceptor';
+    this.mediaWrapper.appendChild(this.clickInterceptor);
+
     this.player.video = this.video;
     this.player.mediaWrapper = this.mediaWrapper;
 
@@ -368,7 +376,16 @@ export class UIManager {
 
     this.bindScrubberEvents();
 
+    // Click interceptor over iframe media to capture clicks & toggles
+    this.clickInterceptor.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeMenu();
+      this.closeContextMenu();
+      this.player.togglePlay();
+    });
+
     this.container.addEventListener('click', (e) => {
+      this.closeContextMenu();
       if (!e.target.closest('.liqu-popover') && !e.target.closest('.liqu-btn') && !e.target.closest('.liqu-bottom-dock') && !e.target.closest('.liqu-top-bar')) {
         this.closeMenu();
         this.player.togglePlay();
@@ -377,14 +394,38 @@ export class UIManager {
       }
     });
 
+    // Custom Right-Click Liquid Glass Context Menu
+    this.container.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showContextMenu(e);
+    });
+
+    this._onDocClick = (e) => {
+      if (this.contextMenu && !this.contextMenu.contains(e.target)) {
+        this.closeContextMenu();
+      }
+    };
+    this._onDocKeydown = (e) => {
+      if (e.key === 'Escape') {
+        this.closeContextMenu();
+        this.closeMenu();
+      }
+    };
+    document.addEventListener('click', this._onDocClick);
+    document.addEventListener('keydown', this._onDocKeydown);
+
     // Native video lifecycle & state event listeners
     this.video.addEventListener('play', () => {
+      this.showSpinner(false);
       this.player._handlePlay('native');
     });
     this.video.addEventListener('pause', () => {
+      this.showSpinner(false);
       this.player._handlePause('native');
     });
     this.video.addEventListener('ended', () => {
+      this.showSpinner(false);
       this.player._handleEnded('native');
     });
     this.video.addEventListener('timeupdate', () => {
@@ -402,17 +443,31 @@ export class UIManager {
     this.video.addEventListener('canplay', () => {
       this.showSpinner(false);
     });
+    this.video.addEventListener('canplaythrough', () => {
+      this.showSpinner(false);
+    });
+    this.video.addEventListener('loadeddata', () => {
+      this.showSpinner(false);
+    });
 
-    // Native video error listener
-    this.video.addEventListener('error', (e) => {
-      const err = this.video.error;
-      let msg = 'Playback failed.';
-      if (err) {
-        if (err.code === 1) msg = 'Playback was aborted.';
-        else if (err.code === 2) msg = 'Network connection failed.';
-        else if (err.code === 3) msg = 'Video decode error.';
-        else if (err.code === 4) msg = 'Video format not supported or cross-origin access denied.';
+    // Native video error listener (guarded against embeds & empty unloads)
+    this.video.addEventListener('error', () => {
+      const sm = this.player.sourceManager;
+      if (sm && (sm.sourceType === 'youtube' || sm.sourceType === 'vimeo' || sm.sourceType === 'test_pattern')) {
+        return;
       }
+      if (!this.video.currentSrc && !this.video.getAttribute('src')) {
+        return;
+      }
+      const err = this.video.error;
+      if (!err || (!this.video.src && err.code === 4)) {
+        return;
+      }
+      let msg = 'Playback failed.';
+      if (err.code === 1) msg = 'Playback was aborted.';
+      else if (err.code === 2) msg = 'Network connection failed.';
+      else if (err.code === 3) msg = 'Video decode error.';
+      else if (err.code === 4) msg = 'Video format not supported or cross-origin access denied.';
       this.showError(msg);
       this.player.emit('error', err || msg);
     });
@@ -819,11 +874,156 @@ export class UIManager {
     }
   }
 
+  showContextMenu(e) {
+    this.closeMenu();
+    this.closeContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'liqu-context-menu liqu-glass-card';
+
+    const isGlowOn = this.player.ambientGlowEnabled;
+    const currentUrl = (this.player.sourceManager && this.player.sourceManager.currentSource)
+      ? (typeof this.player.sourceManager.currentSource === 'string' ? this.player.sourceManager.currentSource : this.player.sourceManager.currentSource.src)
+      : window.location.href;
+
+    menu.innerHTML = `
+      <div class="liqu-ctx-brand">
+        <div class="liqu-ctx-logo">${icons.play}</div>
+        <div class="liqu-ctx-info">
+          <div class="liqu-ctx-name">LiQu Player <span class="liqu-ctx-badge">v1.0.0</span></div>
+          <div class="liqu-ctx-desc">Liquid Glass Optical Engine</div>
+        </div>
+      </div>
+      <div class="liqu-menu-divider"></div>
+      <div class="liqu-ctx-items">
+        <button class="liqu-ctx-item" data-action="toggle-play">
+          <span class="liqu-ctx-item-icon">${this.player.isPlaying ? icons.pause : icons.play}</span>
+          <span>${this.player.isPlaying ? 'Pause' : 'Resume'}</span>
+          <span class="liqu-ctx-shortcut">Space</span>
+        </button>
+        <button class="liqu-ctx-item" data-action="toggle-pip">
+          <span class="liqu-ctx-item-icon">${icons.pip}</span>
+          <span>Picture-in-Picture / Float</span>
+          <span class="liqu-ctx-shortcut">P</span>
+        </button>
+        <button class="liqu-ctx-item" data-action="toggle-fullscreen">
+          <span class="liqu-ctx-item-icon">${icons.fullscreen}</span>
+          <span>Fullscreen</span>
+          <span class="liqu-ctx-shortcut">F</span>
+        </button>
+        <button class="liqu-ctx-item" data-action="toggle-glow">
+          <span class="liqu-ctx-item-icon">${icons.settings}</span>
+          <span>Ambient Cinema Glow</span>
+          <span class="liqu-ctx-toggle">${isGlowOn ? 'ON' : 'OFF'}</span>
+        </button>
+        <div class="liqu-menu-divider"></div>
+        <button class="liqu-ctx-item" data-action="copy-url">
+          <span class="liqu-ctx-item-icon">${icons.forward10}</span>
+          <span>Copy Media URL</span>
+        </button>
+        <button class="liqu-ctx-item" data-action="stats">
+          <span class="liqu-ctx-item-icon">${icons.speedometer}</span>
+          <span>Player Diagnostics</span>
+        </button>
+        <div class="liqu-menu-divider"></div>
+        <a class="liqu-ctx-item liqu-ctx-link" href="https://github.com/ImAhmedZarir/LiQuPlayer.js" target="_blank" rel="noopener noreferrer">
+          <span class="liqu-ctx-item-icon">${icons.check}</span>
+          <span>LiQu Player on GitHub</span>
+          <span class="liqu-ctx-shortcut">↗</span>
+        </a>
+      </div>
+    `;
+
+    this.controlsOverlay.appendChild(menu);
+    this.contextMenu = menu;
+
+    // Position relative to player container bounds
+    const rect = this.container.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+
+    const menuWidth = 240;
+    const menuHeight = 280;
+
+    if (x + menuWidth > rect.width) {
+      x = Math.max(10, rect.width - menuWidth - 10);
+    }
+    if (y + menuHeight > rect.height) {
+      y = Math.max(10, rect.height - menuHeight - 10);
+    }
+
+    menu.style.left = `${Math.max(10, x)}px`;
+    menu.style.top = `${Math.max(10, y)}px`;
+
+    // Liquid glass refraction for context menu
+    if (this.player.liquidEngine) {
+      this.contextMenuGlassInst = this.player.liquidEngine.apply(menu, {
+        radius: 18,
+        scale: -60,
+        chroma: 3,
+        border: 0.05
+      });
+    }
+
+    // Handle context menu clicks
+    menu.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const btn = ev.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'toggle-play') {
+        this.player.togglePlay();
+      } else if (action === 'toggle-pip') {
+        this.player.togglePiP();
+      } else if (action === 'toggle-fullscreen') {
+        this.player.toggleFullscreen();
+      } else if (action === 'toggle-glow') {
+        this.player.toggleAmbientGlow();
+      } else if (action === 'copy-url') {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(currentUrl).then(() => {
+            this.showHUD(icons.check, 'Media URL Copied');
+          }).catch(() => {});
+        } else {
+          this.showHUD(icons.check, 'Media URL Copied');
+        }
+      } else if (action === 'stats') {
+        const type = (this.player.sourceManager && this.player.sourceManager.sourceType) || 'direct';
+        const dur = Math.round(this.player.getDuration());
+        const cur = Math.round(this.player.getCurrentTime());
+        const glass = (this.player.liquidEngine && this.player.liquidEngine.mode) || 'ultra';
+        this.showHUD(icons.speedometer, `LiQu v1.0.0 | ${type.toUpperCase()} | ${glass} | ${cur}s/${dur}s`);
+      }
+      this.closeContextMenu();
+    });
+  }
+
+  closeContextMenu() {
+    if (this.contextMenuGlassInst) {
+      this.contextMenuGlassInst.destroy();
+      this.contextMenuGlassInst = null;
+    }
+    if (this.contextMenu) {
+      this.contextMenu.remove();
+      this.contextMenu = null;
+    }
+  }
+
   destroy() {
+    if (this._onDocClick) {
+      document.removeEventListener('click', this._onDocClick);
+      this._onDocClick = null;
+    }
+    if (this._onDocKeydown) {
+      document.removeEventListener('keydown', this._onDocKeydown);
+      this._onDocKeydown = null;
+    }
     if (this.compactRo) {
       this.compactRo.disconnect();
       this.compactRo = null;
     }
+    this.closeContextMenu();
     this.closeMenu();
     this.container.innerHTML = '';
   }
