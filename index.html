@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiQu Player — Open Source Liquid Glass Video Player</title>
+  <link rel="stylesheet" href="LiQuPlayer.css">
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --border: rgba(255, 255, 255, 0.12);
+      --accent: #38bdf8;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient background gradient orbs */
+    .bg-orbs {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .bg-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.28;
+    }
+    .bg-orb-1 {
+      width: 600px;
+      height: 600px;
+      background: #0284c7;
+      top: -150px;
+      left: 10%;
+    }
+    .bg-orb-2 {
+      width: 500px;
+      height: 500px;
+      background: #7c3aed;
+      top: 30%;
+      right: 5%;
+    }
+    .bg-orb-3 {
+      width: 550px;
+      height: 550px;
+      background: #0ea5e9;
+      bottom: -100px;
+      left: 20%;
+    }
+
+    /* Container */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* Header Nav */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 48px;
+    }
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: #fff;
+    }
+    .logo-orb {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6), inset 0 2px 3px rgba(255,255,255,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 18px;
+    }
+    .logo-text {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .logo-text span {
+      background: linear-gradient(90deg, #38bdf8, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-btn {
+      padding: 9px 18px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #fff;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .hero-tag {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 5vw, 62px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+    .hero p {
+      font-size: clamp(16px, 2vw, 20px);
+      color: #94a3b8;
+      max-width: 720px;
+      margin: 0 auto 32px;
+      line-height: 1.5;
+    }
+
+    /* Live Player Section */
+    .player-showcase {
+      position: relative;
+      margin-bottom: 48px;
+    }
+
+    /* Device frame wrapper */
+    .device-stage {
+      transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), padding 0.35s ease;
+      margin: 0 auto;
+      max-width: 1040px;
+    }
+    .device-stage.mobile-view {
+      max-width: 420px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 44px;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.8);
+    }
+    .device-stage.mobile-view .liqu-player-container {
+      border-radius: 32px;
+    }
+
+    /* Preset Toolbar */
+    .preset-toolbar {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .preset-btn {
+      padding: 9px 18px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #e2e8f0;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .preset-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      transform: translateY(-1px);
+    }
+    .preset-btn.active {
+      background: #38bdf8;
+      color: #041226;
+      border-color: #38bdf8;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.5);
+    }
+
+    /* Device View Switcher */
+    .device-switcher {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .device-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .device-btn.active, .device-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+    }
+
+    /* API Controls Playbench */
+    .bench-panel {
+      margin: 48px auto;
+      max-width: 960px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 24px;
+    }
+    .bench-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .bench-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .bench-btn {
+      padding: 8px 16px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #fff;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .bench-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    /* Feature Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-top: 48px;
+    }
+    .feature-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 24px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .feature-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 14px;
+    }
+    .feature-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    /* Code Snippet Block */
+    .code-block {
+      background: #04060a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 20px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #e2e8f0;
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+    .code-block .hl-tag { color: #f43f5e; }
+    .code-block .hl-attr { color: #38bdf8; }
+    .code-block .hl-str { color: #a7f3d0; }
+    .code-block .hl-cmt { color: #64748b; }
+
+    footer {
+      text-align: center;
+      margin-top: 80px;
+      color: #64748b;
+      font-size: 14px;
+    }
+    footer a { color: #38bdf8; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <!-- Ambient background orbs -->
+  <div class="bg-orbs">
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <a href="#" class="logo-badge">
+        <div class="logo-orb">Q</div>
+        <div class="logo-text">LiQu <span>Player</span></div>
+      </a>
+      <div class="nav-links">
+        <a href="https://github.com/ImAhmedZarir/LiQuPlayer.js" target="_blank" class="nav-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+          GitHub Repository
+        </a>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <span class="hero-tag">✨ Open Source &bull; Apple Liquid Glass UI</span>
+      <h1>LiQu Player</h1>
+      <p>A powerhouse video player built with genuine Apple-style optical rim refraction, spherical fluid orbs, universal format support (YouTube, HLS, DASH, Direct), and intelligent low-RAM hardware adaptation.</p>
+    </section>
+
+    <!-- Preset Switcher -->
+    <div class="preset-toolbar">
+      <button class="preset-btn active" data-preset="odyssey">🌊 The Odyssey (Ocean Ship)</button>
+      <button class="preset-btn" data-preset="pattern">📺 Parallel Hearts (Test Stream)</button>
+      <button class="preset-btn" data-preset="gold">✨ LED Gold Theme</button>
+      <button class="preset-btn" data-preset="hls">🎬 HLS Stream (Tears of Steel)</button>
+      <button class="preset-btn" data-preset="youtube">▶️ YouTube Stream</button>
+    </div>
+
+    <!-- Live Player Stage -->
+    <section class="player-showcase">
+      <div class="device-stage" id="deviceStage">
+        <div id="liquPlayer"></div>
+      </div>
+
+      <!-- Device View Controls -->
+      <div class="device-switcher">
+        <button class="device-btn active" data-view="desktop">🖥️ Desktop Cinema</button>
+        <button class="device-btn" data-view="mobile">📱 Mobile Frame (Image 2)</button>
+      </div>
+    </section>
+
+    <!-- Interactive API Playbench -->
+    <div class="bench-panel">
+      <div class="bench-title">⚡ Interactive Developer API Bench</div>
+      <div class="bench-buttons">
+        <button class="bench-btn" onclick="player.togglePlay()">Toggle Play / Pause</button>
+        <button class="bench-btn" onclick="player.seekBy(-10)">Rewind -10s</button>
+        <button class="bench-btn" onclick="player.seekBy(10)">Forward +10s</button>
+        <button class="bench-btn" onclick="player.setPlaybackRate(1.5)">Speed 1.5x</button>
+        <button class="bench-btn" onclick="player.setPlaybackRate(1.0)">Speed 1.0x</button>
+        <button class="bench-btn" onclick="player.toggleFullscreen()">Toggle Fullscreen</button>
+        <button class="bench-btn" onclick="player.togglePiP()">Toggle PiP</button>
+        <button class="bench-btn" onclick="player.liquidEngine.setMode('ultra')">Mode: Ultra Fluid</button>
+        <button class="bench-btn" onclick="player.liquidEngine.setMode('balanced')">Mode: Balanced</button>
+        <button class="bench-btn" onclick="player.liquidEngine.setMode('lite')">Mode: Lite (Low RAM)</button>
+      </div>
+    </div>
+
+    <!-- Quick Start Code -->
+    <div class="bench-panel">
+      <div class="bench-title">📦 Quick Start Integration</div>
+      <p style="color: #94a3b8; font-size: 14px;">Drop into any website, webapp, Electron, Tauri, iOS WebKit, or Android WebView with zero build steps:</p>
+      <div class="code-block">
+<span class="hl-cmt">&lt;!-- 1. Include CSS & JS --&gt;</span>
+&lt;<span class="hl-tag">link</span> <span class="hl-attr">rel</span>=<span class="hl-str">"stylesheet"</span> <span class="hl-attr">href</span>=<span class="hl-str">"LiQuPlayer.css"</span>&gt;
+&lt;<span class="hl-tag">script</span> <span class="hl-attr">src</span>=<span class="hl-str">"LiQuPlayer.js"</span>&gt;&lt;/<span class="hl-tag">script</span>&gt;
+
+<span class="hl-cmt">&lt;!-- 2. Target Container --&gt;</span>
+&lt;<span class="hl-tag">div</span> <span class="hl-attr">id</span>=<span class="hl-str">"player"</span> <span class="hl-attr">style</span>=<span class="hl-str">"max-width: 960px;"</span>&gt;&lt;/<span class="hl-tag">div</span>&gt;
+
+<span class="hl-cmt">&lt;!-- 3. Initialize --&gt;</span>
+&lt;<span class="hl-tag">script</span>&gt;
+  <span class="hl-tag">const</span> player = <span class="hl-tag">new</span> <span class="hl-attr">LiQuPlayer</span>(<span class="hl-str">'#player'</span>, {
+    <span class="hl-attr">source</span>: <span class="hl-str">'https://example.com/video.mp4'</span>, <span class="hl-cmt">// MP4, HLS (.m3u8), DASH (.mpd), or YouTube URL</span>
+    <span class="hl-attr">title</span>: <span class="hl-str">'The Odyssey - The Real Story'</span>,
+    <span class="hl-attr">subtitle</span>: <span class="hl-str">'S1 · E1'</span>,
+    <span class="hl-attr">poster</span>: <span class="hl-str">'assets/images/preview-odyssey-ship.png'</span>,
+    <span class="hl-attr">glassMode</span>: <span class="hl-str">'ultra'</span>, <span class="hl-cmt">// 'ultra', 'balanced', or 'lite'</span>
+    <span class="hl-attr">ambientGlow</span>: <span class="hl-attr">true</span>
+  });
+&lt;/<span class="hl-tag">script</span>&gt;
+      </div>
+    </div>
+
+    <!-- Features Grid -->
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">💧</div>
+        <h3>True Optical Refraction</h3>
+        <p>Uses SVG displacement filters and chromatic dispersion to realistically refract the video underneath at the rim with authentic rainbow prism fringe.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌐</div>
+        <h3>Universal Media Support</h3>
+        <p>Plays direct HTML5 videos, HLS (.m3u8), MPEG-DASH (.mpd), YouTube URLs, and Vimeo with zero configuration under the same seamless liquid glass UI.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Old Device & Low RAM Mode</h3>
+        <p>Built-in 3-tier hardware detection (Ultra Fluid, Balanced Frosted, Lite). Automatic map reuse and debounced canvas keep RAM under 15MB.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3>All Interfaces & Gestures</h3>
+        <p>Responsive design for Web, Desktop (Electron/Tauri), Android app, iOS app, and PWA. Full double-tap to seek and vertical swipe brightness/volume.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎧</div>
+        <h3>MediaSession Integration</h3>
+        <p>Syncs with system lock screen media notifications, hardware volume/seek keys, and external control centers on iOS, Android, macOS, and Windows.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌟</div>
+        <h3>Ambient Cinema Glow</h3>
+        <p>Dynamic ambient lighting samples the video colors in real-time to cast a soft theater glow around the liquid player container.</p>
+      </div>
+    </div>
+
+    <footer>
+      <p>LiQu Player is Open Source under the <a href="LICENSE">MIT License</a>. Created with ❤️ by <a href="https://github.com/ImAhmedZarir" target="_blank">Ahmed Zarir</a>.</p>
+    </footer>
+  </div>
+
+  <!-- Scripts -->
+  <script src="LiQuPlayer.js"></script>
+  <script>
+    const presets = {
+      odyssey: {
+        source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        title: 'The Odyssey - The Real Story',
+        subtitle: 'S1 · E1',
+        poster: 'assets/images/preview-odyssey-ship.png',
+        nextEpisode: { title: 'Next · S1 E2', onClick: () => alert('Next Episode Loading...') }
+      },
+      pattern: {
+        source: 'test:colorbar',
+        title: 'Parallel Hearts',
+        subtitle: 'S1 · E1',
+        poster: 'assets/images/preview-desktop-glass.png',
+        nextEpisode: { title: 'Next · S1 E2', onClick: () => alert('Next Episode Loading...') }
+      },
+      gold: {
+        source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        title: 'Gold Ambient Pulse',
+        subtitle: 'Live Showcase',
+        poster: 'assets/images/preview-led-gold.png'
+      },
+      hls: {
+        source: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+        title: 'Tears of Steel (4K HLS)',
+        subtitle: 'Blender Open Movie',
+        poster: 'assets/images/preview-odyssey-aerial.jpg'
+      },
+      youtube: {
+        source: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        title: 'YouTube Stream Integration',
+        subtitle: 'IFrame Seamless Sync'
+      }
+    };
+
+    // Initialize player
+    const player = new LiQuPlayer('#liquPlayer', presets.odyssey);
+    window.player = player;
+
+    // Preset Buttons
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const p = presets[btn.dataset.preset];
+        if (p) {
+          player.setSource(p.source, { title: p.title, subtitle: p.subtitle, poster: p.poster });
+        }
+      });
+    });
+
+    // Device View Buttons
+    const deviceStage = document.getElementById('deviceStage');
+    document.querySelectorAll('.device-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.device-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (btn.dataset.view === 'mobile') {
+          deviceStage.classList.add('mobile-view');
+        } else {
+          deviceStage.classList.remove('mobile-view');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

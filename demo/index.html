@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiQu Player — Liquid Glass Demo</title>
+  <link rel="stylesheet" href="../LiQuPlayer.css">
+  <style>
+    body {
+      background: #07090e;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      margin: 0;
+      padding: 30px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    .header p {
+      color: #94a3b8;
+      font-size: 15px;
+    }
+    .player-box {
+      width: 100%;
+      max-width: 980px;
+      margin-bottom: 30px;
+    }
+    .source-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .source-btn {
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #fff;
+      cursor: pointer;
+      font-size: 13.5px;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    .source-btn:hover, .source-btn.active {
+      background: #38bdf8;
+      color: #000;
+      border-color: #38bdf8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>LiQu Player Demo</h1>
+    <p>Real optical refraction, spherical fluid orbs, universal format engine.</p>
+  </div>
+
+  <div class="source-bar">
+    <button class="source-btn active" onclick="loadSource('odyssey')">🌊 The Odyssey</button>
+    <button class="source-btn" onclick="loadSource('colorbar')">📺 Parallel Hearts (Test)</button>
+    <button class="source-btn" onclick="loadSource('hls')">🎬 Tears of Steel (HLS)</button>
+    <button class="source-btn" onclick="loadSource('youtube')">▶️ YouTube Video</button>
+  </div>
+
+  <div class="player-box">
+    <div id="liquPlayer"></div>
+  </div>
+
+  <script src="../LiQuPlayer.js"></script>
+  <script>
+    const sources = {
+      odyssey: {
+        source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        title: 'The Odyssey - The Real Story',
+        subtitle: 'S1 · E1',
+        poster: '../assets/images/preview-odyssey-ship.png'
+      },
+      colorbar: {
+        source: 'test:colorbar',
+        title: 'Parallel Hearts',
+        subtitle: 'S1 · E1',
+        poster: '../assets/images/preview-desktop-glass.png'
+      },
+      hls: {
+        source: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+        title: 'Tears of Steel (HLS)',
+        subtitle: '4K Stream',
+        poster: '../assets/images/preview-odyssey-aerial.jpg'
+      },
+      youtube: {
+        source: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        title: 'YouTube Stream',
+        subtitle: 'IFrame Integration'
+      }
+    };
+
+    const player = new LiQuPlayer('#liquPlayer', sources.odyssey);
+
+    function loadSource(key) {
+      document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      const item = sources[key];
+      player.setSource(item.source, { title: item.title, subtitle: item.subtitle, poster: item.poster });
+    }
+  </script>
+</body>
+</html>

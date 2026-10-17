@@ -1,0 +1,36 @@
+{
+  "name": "liqu-player",
+  "version": "1.0.0",
+  "description": "Powerful open-source liquid glass video player with authentic optical rim refraction, universal streaming engine, and low-RAM hardware optimization.",
+  "main": "LiQuPlayer.js",
+  "module": "src/LiQuPlayer.js",
+  "style": "LiQuPlayer.css",
+  "scripts": {
+    "start": "npx serve .",
+    "test": "echo \"Ready for testing\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ImAhmedZarir/LiQuPlayer.js.git"
+  },
+  "keywords": [
+    "video-player",
+    "liquid-glass",
+    "html5-video",
+    "hls",
+    "mpeg-dash",
+    "youtube",
+    "vimeo",
+    "optical-refraction",
+    "chromatic-aberration",
+    "glassmorphism",
+    "apple-glass",
+    "media-player"
+  ],
+  "author": "Ahmed Zarir <im.ahmedzarir@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ImAhmedZarir/LiQuPlayer.js/issues"
+  },
+  "homepage": "https://github.com/ImAhmedZarir/LiQuPlayer.js#readme"
+}
