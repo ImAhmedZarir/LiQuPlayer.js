@@ -197,7 +197,21 @@ export class LiQuPlayer {
       this.sourceManager.pause();
     } catch (_) {}
   }
-  togglePlay() { if (this.isPlaying) this.pause(); else this.play(); }
+  togglePlay() {
+    const sm = this.sourceManager;
+    if (sm && (sm.sourceType === 'direct' || sm.sourceType === 'hls' || sm.sourceType === 'dash')) {
+      if (this.video) {
+        if (this.video.paused) {
+          this.play();
+        } else {
+          this.pause();
+        }
+        return;
+      }
+    }
+    if (this.isPlaying) this.pause();
+    else this.play();
+  }
   seekTo(sec) { this.sourceManager.seek(clamp(sec, 0, this.getDuration() || 999999)); }
   seekBy(delta) { this.seekTo(this.getCurrentTime() + delta); }
 

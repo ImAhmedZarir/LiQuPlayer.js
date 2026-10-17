@@ -7,61 +7,66 @@ export const icons = {
   
   pause: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5a1.5 1.5 0 0 0-1.5 1.5v11A1.5 1.5 0 0 0 7 19h2a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 9 5H7zm8 0a1.5 1.5 0 0 0-1.5 1.5v11a1.5 1.5 0 0 0 1.5 1.5h2a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 17 5h-2z"/></svg>`,
   
-  replay10: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M4.5 10A8 8 0 1 1 12 20a7.97 7.97 0 0 1-5.65-2.34"/>
-    <polyline points="4.5 5 4.5 10 9.5 10"/>
-    <text x="12" y="14.8" font-size="7.5" font-weight="800" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" text-anchor="middle" fill="currentColor" stroke="none">10</text>
+  replay10: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 10A8 8 0 1 1 12 20a7.97 7.97 0 0 1-5.65-2.34"/>
+    <polyline points="4 5 4 10 9 10"/>
+    <text x="12" y="14.5" font-size="6.8" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" text-anchor="middle" fill="currentColor" stroke="none">10</text>
   </svg>`,
 
-  forward10: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M19.5 10A8 8 0 1 0 12 20a7.97 7.97 0 0 0 5.65-2.34"/>
-    <polyline points="19.5 5 19.5 10 14.5 10"/>
-    <text x="12" y="14.8" font-size="7.5" font-weight="800" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" text-anchor="middle" fill="currentColor" stroke="none">10</text>
+  forward10: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 10A8 8 0 1 0 12 20a7.97 7.97 0 0 0 5.65-2.34"/>
+    <polyline points="20 5 20 10 15 10"/>
+    <text x="12" y="14.5" font-size="6.8" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" text-anchor="middle" fill="currentColor" stroke="none">10</text>
   </svg>`,
 
-  volumeHigh: `<svg viewBox="0 0 24 24" fill="currentColor">
-    <path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zm-3.5 1.77L6.3 8.5H3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h3.3l4.2 3.5a1 1 0 0 0 1.5-.86V5.86a1 1 0 0 0-1.5-.86zM14 8.83v6.34c1.24-.62 2-1.9 2-3.17s-.76-2.55-2-3.17z"/>
+  volumeHigh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+    <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+    <path d="M19 5a9.5 9.5 0 0 1 0 14"/>
   </svg>`,
 
-  volumeMute: `<svg viewBox="0 0 24 24" fill="currentColor">
-    <path d="M3.27 2L2 3.27l4.99 4.99L6.3 8.5H3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h3.3l4.2 3.5a1 1 0 0 0 1.5-.86v-6.37l4.88 4.88c-.58.45-1.21.82-1.88 1.09v2.06c1.19-.38 2.29-.98 3.23-1.74L20.73 22 22 20.73 3.27 2zm7.23 3.86a1 1 0 0 0-1.5-.86l-2.07 1.73 3.57 3.57V5.86zm8.5 6.14c0 1.27-.76 2.55-2 3.17v-2.13c.48-.32.8-.84.8-1.04 0-.12-.04-.25-.11-.37l1.52 1.52c-.14-.72-.21-1.15-.21-1.15zM14 3.23v2.06c2.89.86 5 3.54 5 6.71 0 1.05-.24 2.05-.67 2.95l1.52 1.52A10.74 10.74 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77z"/>
+  volumeMute: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+    <line x1="22" y1="9" x2="16" y2="15"/>
+    <line x1="16" y1="9" x2="22" y2="15"/>
   </svg>`,
 
   subtitles: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="2" y="5" width="20" height="14" rx="4"/>
-    <path d="M7 14h2a1.5 1.5 0 0 0 1.5-1.5v-1a1.5 1.5 0 0 0-1.5-1.5H7v4zm7 0h2a1.5 1.5 0 0 0 1.5-1.5v-1a1.5 1.5 0 0 0-1.5-1.5H14v4z" fill="currentColor" stroke="none"/>
+    <rect x="2.5" y="5" width="19" height="14" rx="4"/>
+    <path d="M10 9.5a2.5 2.5 0 0 0-2.5 2.5v0a2.5 2.5 0 0 0 2.5 2.5"/>
+    <path d="M16.5 9.5a2.5 2.5 0 0 0-2.5 2.5v0a2.5 2.5 0 0 0 2.5 2.5"/>
   </svg>`,
 
   speedometer: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 21a9 9 0 1 0-9-9c0 2.21.8 4.24 2.12 5.82L12 12"/>
-    <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
-    <path d="m14 10 4-4"/>
+    <path d="M12 20a8 8 0 1 0-8-8 8 8 0 0 0 1.6 4.8"/>
+    <circle cx="12" cy="12" r="2" fill="currentColor"/>
+    <path d="M12 12l4-4"/>
   </svg>`,
 
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="4" y1="7" x2="20" y2="7"/>
-    <circle cx="9" cy="7" r="2" fill="currentColor"/>
+    <circle cx="9" cy="7" r="2.2" fill="currentColor"/>
     <line x1="4" y1="17" x2="20" y2="17"/>
-    <circle cx="15" cy="17" r="2" fill="currentColor"/>
+    <circle cx="15" cy="17" r="2.2" fill="currentColor"/>
   </svg>`,
 
-  quality: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="2" y="5" width="20" height="14" rx="3"/>
-    <path d="M6.5 9v6m0-3h3.5m0-3v6M13.5 9v6h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-2z"/>
+  quality: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2.5" y="5" width="19" height="14" rx="3.5"/>
+    <path d="M7 9v6m0-3h3m0-3v6M14 9v6h1.8a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H14z"/>
   </svg>`,
 
-  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"/>
     <line x1="6" y1="6" x2="18" y2="18"/>
   </svg>`,
 
   pip: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="3"/>
-    <rect x="12" y="11" width="8" height="6" rx="1.5" fill="currentColor"/>
+    <rect x="2.5" y="4.5" width="19" height="15" rx="3"/>
+    <rect x="11.5" y="11" width="8" height="6" rx="1.5" fill="currentColor"/>
   </svg>`,
 
-  fullscreen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M15 3h6v6M9 21H3v-6M21 15v6h-6M3 9V3h6"/>
+  fullscreen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 4h5v5M9 20H4v-5M20 15v5h-5M4 9V4h5"/>
   </svg>`,
 
   exitFullscreen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">

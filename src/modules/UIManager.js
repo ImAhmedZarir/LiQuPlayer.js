@@ -274,19 +274,19 @@ export class UIManager {
     const le = this.player.liquidEngine;
     if (!le) return;
 
-    le.apply(this.playBtn, { isOrb: true, scale: -140, chroma: 8, border: 0.04, mapBlur: 14 });
-    le.apply(this.seekBackBtn, { radius: 36, scale: -95, chroma: 5, border: 0.08 });
-    le.apply(this.seekFwdBtn, { radius: 36, scale: -95, chroma: 5, border: 0.08 });
-    le.apply(this.backBtn, { radius: 24, scale: -85, chroma: 4, border: 0.09 });
+    le.apply(this.playBtn, { isOrb: true, scale: -100, chroma: 5, border: 0.04, mapBlur: 10 });
+    le.apply(this.seekBackBtn, { radius: 25, scale: -35, chroma: 2, border: 0.06 });
+    le.apply(this.seekFwdBtn, { radius: 25, scale: -35, chroma: 2, border: 0.06 });
+    le.apply(this.backBtn, { radius: 20, scale: -35, chroma: 2, border: 0.06 });
 
     const titleBadge = this.topBar.querySelector('.liqu-title-badge');
     const topActions = this.topBar.querySelector('.liqu-top-actions');
-    if (titleBadge) le.apply(titleBadge, { radius: 22, scale: -75, chroma: 4, border: 0.06 });
-    if (topActions) le.apply(topActions, { radius: 24, scale: -80, chroma: 4, border: 0.06 });
-    le.apply(this.bottomDock, { radius: 28, scale: -85, chroma: 5, border: 0.05 });
+    if (titleBadge) le.apply(titleBadge, { radius: 20, scale: -40, chroma: 2, border: 0.05 });
+    if (topActions) le.apply(topActions, { radius: 20, scale: -40, chroma: 2, border: 0.05 });
+    le.apply(this.bottomDock, { radius: 24, scale: -45, chroma: 2, border: 0.05 });
 
     if (this.nextEpisodeBtn) {
-      le.apply(this.nextEpisodeBtn, { radius: 20, scale: -80, chroma: 4, border: 0.06 });
+      le.apply(this.nextEpisodeBtn, { radius: 20, scale: -40, chroma: 2, border: 0.05 });
     }
   }
 
@@ -369,9 +369,38 @@ export class UIManager {
     this.bindScrubberEvents();
 
     this.container.addEventListener('click', (e) => {
-      if (!e.target.closest('.liqu-popover') && !e.target.closest('.liqu-btn')) {
+      if (!e.target.closest('.liqu-popover') && !e.target.closest('.liqu-btn') && !e.target.closest('.liqu-bottom-dock') && !e.target.closest('.liqu-top-bar')) {
+        this.closeMenu();
+        this.player.togglePlay();
+      } else if (!e.target.closest('.liqu-popover') && !e.target.closest('.liqu-btn')) {
         this.closeMenu();
       }
+    });
+
+    // Native video lifecycle & state event listeners
+    this.video.addEventListener('play', () => {
+      this.player._handlePlay('native');
+    });
+    this.video.addEventListener('pause', () => {
+      this.player._handlePause('native');
+    });
+    this.video.addEventListener('ended', () => {
+      this.player._handleEnded('native');
+    });
+    this.video.addEventListener('timeupdate', () => {
+      const cur = this.video.currentTime || 0;
+      const dur = (isFinite(this.video.duration) && this.video.duration > 0) ? this.video.duration : 0;
+      const pct = dur > 0 ? (cur / dur) : 0;
+      this.player.onTimeUpdateBridge(cur, dur, pct);
+    });
+    this.video.addEventListener('waiting', () => {
+      this.showSpinner(true);
+    });
+    this.video.addEventListener('playing', () => {
+      this.showSpinner(false);
+    });
+    this.video.addEventListener('canplay', () => {
+      this.showSpinner(false);
     });
 
     // Native video error listener

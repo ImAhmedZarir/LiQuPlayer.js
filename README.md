@@ -3,6 +3,7 @@
 > **The Powerhouse Open-Source Video Player Inspired by Apple-Style Liquid Glass UI.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/liquplayer.svg?color=cb3837)](https://www.npmjs.com/package/liquplayer)
 [![Version](https://img.shields.io/badge/Version-1.0.0-emerald.svg)](package.json)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ImAhmedZarir/LiQuPlayer.js/pulls)
 [![Liquid Glass](https://img.shields.io/badge/UI-Liquid%20Glass%20Optics-cyan.svg)](#features)
@@ -63,39 +64,57 @@
 
 ---
 
+## Installation
+
+Install via npm, yarn, or pnpm:
+
+```bash
+npm i liquplayer
+# or
+yarn add liquplayer
+# or
+pnpm add liquplayer
+```
+
+---
+
 ## Quick Start
 
-### 1. Include CSS & JS
+### 1. Modern ESM / Bundlers (Vite, Next.js, Nuxt, Webpack, Electron, React, Vue, Svelte)
+
+```javascript
+import LiQuPlayer from 'liquplayer';
+import 'liquplayer/dist/LiQuPlayer.css';
+
+const player = new LiQuPlayer('#player', {
+  source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+  title: 'The Odyssey - The Real Story',
+  subtitle: 'S1 · E1',
+  poster: 'assets/images/preview-odyssey-ship.png',
+  glassMode: 'ultra', // 'ultra' | 'balanced' | 'lite'
+  ambientGlow: true
+});
+```
+
+### 2. Vanilla HTML / CDN / Direct Script Tag
 
 ```html
 <!-- LiQu Player Stylesheet -->
 <link rel="stylesheet" href="LiQuPlayer.css">
 
+<!-- Container Element -->
+<div id="player" style="max-width: 960px; margin: 0 auto;"></div>
+
 <!-- LiQu Player Standalone Library -->
 <script src="LiQuPlayer.js"></script>
-```
-
-### 2. Add Container Element
-
-```html
-<div id="player" style="max-width: 960px; margin: 0 auto;"></div>
-```
-
-### 3. Initialize
-
-```html
 <script>
   const player = new LiQuPlayer('#player', {
     source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     title: 'The Odyssey - The Real Story',
     subtitle: 'S1 · E1',
     poster: 'assets/images/preview-odyssey-ship.png',
-    glassMode: 'ultra', // 'ultra' | 'balanced' | 'lite'
-    ambientGlow: true,
-    nextEpisode: {
-      title: 'Next · S1 E2',
-      onClick: () => console.log('Playing Next Episode...')
-    }
+    glassMode: 'ultra',
+    ambientGlow: true
   });
 </script>
 ```

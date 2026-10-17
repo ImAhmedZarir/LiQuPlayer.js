@@ -1,10 +1,24 @@
 {
-  "name": "liqu-player",
+  "name": "liquplayer",
   "version": "1.0.0",
   "description": "Powerful open-source liquid glass video player with authentic optical rim refraction, universal streaming engine, and low-RAM hardware optimization.",
   "main": "LiQuPlayer.js",
   "module": "src/LiQuPlayer.js",
   "style": "LiQuPlayer.css",
+  "files": [
+    "LiQuPlayer.js",
+    "LiQuPlayer.css",
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "import": "./src/LiQuPlayer.js",
+      "require": "./LiQuPlayer.js"
+    },
+    "./dist/LiQuPlayer.css": "./dist/LiQuPlayer.css",
+    "./LiQuPlayer.css": "./LiQuPlayer.css"
+  },
   "scripts": {
     "build": "node scripts/bundle.js",
     "start": "npx serve .",
