@@ -187,8 +187,16 @@ export class LiQuPlayer {
   }
 
   // --- Public API ---
-  play() { this.sourceManager.play(); }
-  pause() { this.sourceManager.pause(); }
+  play() {
+    try {
+      this.sourceManager.play();
+    } catch (_) {}
+  }
+  pause() {
+    try {
+      this.sourceManager.pause();
+    } catch (_) {}
+  }
   togglePlay() { if (this.isPlaying) this.pause(); else this.play(); }
   seekTo(sec) { this.sourceManager.seek(clamp(sec, 0, this.getDuration() || 999999)); }
   seekBy(delta) { this.seekTo(this.getCurrentTime() + delta); }

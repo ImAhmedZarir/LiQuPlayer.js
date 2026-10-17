@@ -89,7 +89,21 @@ export class SourceManager {
     video.load();
 
     if (this.player.options.autoplay) {
-      video.play().catch(() => {});
+      try {
+        const p = video.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(err => {
+            console.warn('[LiQuPlayer] Autoplay prevented, retrying muted:', err);
+            if (!this.player.isMuted()) {
+              this.player.toggleMute(true);
+              try {
+                const p2 = video.play();
+                if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
+              } catch (_) {}
+            }
+          });
+        }
+      } catch (_) {}
     }
   }
 
@@ -100,6 +114,22 @@ export class SourceManager {
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = url;
+      if (this.player.options.autoplay) {
+        try {
+          const p = video.play();
+          if (p && typeof p.catch === 'function') {
+            p.catch(err => {
+              if (!this.player.isMuted()) {
+                this.player.toggleMute(true);
+                try {
+                  const p2 = video.play();
+                  if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
+                } catch (_) {}
+              }
+            });
+          }
+        } catch (_) {}
+      }
       return;
     }
 
@@ -135,7 +165,21 @@ export class SourceManager {
         }
 
         if (this.player.options.autoplay) {
-          video.play().catch(() => {});
+          try {
+            const p = video.play();
+            if (p && typeof p.catch === 'function') {
+              p.catch(err => {
+                console.warn('[LiQuPlayer] HLS autoplay prevented, retrying muted:', err);
+                if (!this.player.isMuted()) {
+                  this.player.toggleMute(true);
+                  try {
+                    const p2 = video.play();
+                    if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
+                  } catch (_) {}
+                }
+              });
+            }
+          } catch (_) {}
         }
       });
 
@@ -250,6 +294,19 @@ export class SourceManager {
                 this.ytPlayer.setVolume(this.player.getVolume() * 100);
                 if (this.player.isMuted()) this.ytPlayer.mute();
                 this.ytPlayer.setPlaybackRate(this.player.getPlaybackRate());
+                if (this.player.options.autoplay) {
+                  try {
+                    const res = this.ytPlayer.playVideo();
+                    if (res && typeof res.catch === 'function') res.catch(() => {});
+                  } catch (_) {
+                    try {
+                      this.ytPlayer.mute();
+                      this.player.toggleMute(true);
+                      const res2 = this.ytPlayer.playVideo();
+                      if (res2 && typeof res2.catch === 'function') res2.catch(() => {});
+                    } catch (_) {}
+                  }
+                }
               } catch (_) {}
               this.startYouTubeSync();
               resolve();
@@ -441,13 +498,57 @@ export class SourceManager {
 
   play() {
     if (this.sourceType === 'youtube' && this.ytPlayer && this.ytPlayer.playVideo) {
-      this.ytPlayer.playVideo();
+      try {
+        const res = this.ytPlayer.playVideo();
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {
+            try {
+              this.ytPlayer.mute();
+              this.player.toggleMute(true);
+              const res2 = this.ytPlayer.playVideo();
+              if (res2 && typeof res2.catch === 'function') res2.catch(() => {});
+            } catch (_) {}
+          });
+        }
+      } catch (_) {
+        try {
+          this.ytPlayer.mute();
+          this.player.toggleMute(true);
+          const res2 = this.ytPlayer.playVideo();
+          if (res2 && typeof res2.catch === 'function') res2.catch(() => {});
+        } catch (_) {}
+      }
     } else if (this.sourceType === 'vimeo' && this.vimeoPlayer) {
-      this.vimeoPlayer.play();
+      try {
+        const res = this.vimeoPlayer.play();
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {
+            try {
+              this.vimeoPlayer.setMuted(true);
+              this.player.toggleMute(true);
+              this.vimeoPlayer.play().catch(() => {});
+            } catch (_) {}
+          });
+        }
+      } catch (_) {}
     } else if (this.player.video) {
-      this.player.video.play().catch(err => {
-        console.warn('[LiQuPlayer] Autoplay prevented:', err);
-      });
+      try {
+        const p = this.player.video.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(err => {
+            console.warn('[LiQuPlayer] Autoplay prevented, attempting muted playback:', err);
+            if (!this.player.isMuted()) {
+              this.player.toggleMute(true);
+              try {
+                const p2 = this.player.video.play();
+                if (p2 && typeof p2.catch === 'function') {
+                  p2.catch(() => {});
+                }
+              } catch (_) {}
+            }
+          });
+        }
+      } catch (_) {}
     }
   }
 

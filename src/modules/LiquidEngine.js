@@ -18,13 +18,13 @@ export class LiquidEngine {
   }
 
   checkRefractionSupport() {
-    if (typeof window === 'undefined') return false;
-    const ua = navigator.userAgent;
-    const isSafari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Vivaldi/.test(ua);
-    const isFirefox = /Firefox/.test(ua);
-    if (isSafari || isFirefox) return false;
-    if (typeof CSS === 'undefined' || !CSS.supports || !CSS.supports("backdrop-filter", "url(#lg)")) return false;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return false;
     try {
+      const ua = navigator.userAgent || '';
+      const isSafari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Vivaldi/.test(ua);
+      const isFirefox = /Firefox/.test(ua);
+      if (isSafari || isFirefox) return false;
+      if (typeof CSS === 'undefined' || !CSS.supports || !CSS.supports("backdrop-filter", "url(#lg)")) return false;
       const c = document.createElement("canvas");
       c.width = c.height = 4;
       return !!c.getContext("2d");
@@ -34,7 +34,7 @@ export class LiquidEngine {
   }
 
   getDefs() {
-    if (sharedSvgDefs && document.body.contains(sharedSvgDefs.ownerSVGElement)) {
+    if (sharedSvgDefs && document.body && document.body.contains(sharedSvgDefs.ownerSVGElement)) {
       return sharedSvgDefs;
     }
     const svg = document.createElementNS(SVG_NS, "svg");
@@ -45,10 +45,11 @@ export class LiquidEngine {
     svg.style.pointerEvents = "none";
     svg.style.left = "-9999px";
     svg.style.top = "-9999px";
-    svg.className = "liqu-svg-filters";
+    svg.setAttribute("class", "liqu-svg-filters");
     sharedSvgDefs = document.createElementNS(SVG_NS, "defs");
     svg.appendChild(sharedSvgDefs);
-    document.body.appendChild(svg);
+    const mount = document.body || document.documentElement;
+    if (mount) mount.appendChild(svg);
     return sharedSvgDefs;
   }
 
@@ -58,142 +59,154 @@ export class LiquidEngine {
       return mapCache.get(key);
     }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.min(w, 360);
-    canvas.height = Math.min(h, 360);
-    const scaleX = canvas.width / w;
-    const scaleY = canvas.height / h;
-    const ctx = canvas.getContext("2d");
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.min(w, 360);
+      canvas.height = Math.min(h, 360);
+      const scaleX = canvas.width / w;
+      const scaleY = canvas.height / h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return "";
 
-    if (isSpherical) {
-      const cw = canvas.width;
-      const ch = canvas.height;
-      const imgData = ctx.createImageData(cw, ch);
-      const data = imgData.data;
-      const cx = cw / 2;
-      const cy = ch / 2;
-      const r = Math.min(cx, cy);
+      if (isSpherical) {
+        const cw = canvas.width;
+        const ch = canvas.height;
+        const imgData = ctx.createImageData(cw, ch);
+        const data = imgData.data;
+        const cx = cw / 2;
+        const cy = ch / 2;
+        const r = Math.min(cx, cy);
 
-      for (let y = 0; y < ch; y++) {
-        for (let x = 0; x < cw; x++) {
-          const idx = (y * cw + x) * 4;
-          const dx = x - cx;
-          const dy = y - cy;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+        for (let y = 0; y < ch; y++) {
+          for (let x = 0; x < cw; x++) {
+            const idx = (y * cw + x) * 4;
+            const dx = x - cx;
+            const dy = y - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < r) {
-            const norm = dist / r;
-            const factor = Math.sin(norm * Math.PI) * 128;
-            const dirX = norm > 0 ? (dx / dist) : 0;
-            const dirY = norm > 0 ? (dy / dist) : 0;
-            
-            data[idx] = Math.floor(128 + dirX * factor);
-            data[idx + 1] = 128;
-            data[idx + 2] = Math.floor(128 + dirY * factor);
-            data[idx + 3] = 255;
-          } else {
-            data[idx] = 128;
-            data[idx + 1] = 128;
-            data[idx + 2] = 128;
-            data[idx + 3] = 255;
+            if (dist < r) {
+              const norm = dist / r;
+              const factor = Math.sin(norm * Math.PI) * 128;
+              const dirX = norm > 0 ? (dx / dist) : 0;
+              const dirY = norm > 0 ? (dy / dist) : 0;
+              
+              data[idx] = Math.floor(128 + dirX * factor);
+              data[idx + 1] = 128;
+              data[idx + 2] = Math.floor(128 + dirY * factor);
+              data[idx + 3] = 255;
+            } else {
+              data[idx] = 128;
+              data[idx + 1] = 128;
+              data[idx + 2] = 128;
+              data[idx + 3] = 255;
+            }
           }
         }
-      }
-      ctx.putImageData(imgData, 0, 0);
-    } else {
-      const cw = canvas.width;
-      const ch = canvas.height;
-      const gx = ctx.createLinearGradient(0, 0, cw, 0);
-      gx.addColorStop(0, "rgb(0,0,0)");
-      gx.addColorStop(1, "rgb(255,0,0)");
-      ctx.fillStyle = gx;
-      ctx.fillRect(0, 0, cw, ch);
-
-      const gy = ctx.createLinearGradient(0, 0, 0, ch);
-      gy.addColorStop(0, "rgb(0,0,0)");
-      gy.addColorStop(1, "rgb(0,0,255)");
-      ctx.globalCompositeOperation = "difference";
-      ctx.fillStyle = gy;
-      ctx.fillRect(0, 0, cw, ch);
-
-      ctx.globalCompositeOperation = "source-over";
-      const inset = border * Math.min(cw, ch);
-      ctx.filter = `blur(${mapBlur * scaleX}px)`;
-      ctx.fillStyle = "rgba(128,128,128,0.94)";
-      ctx.beginPath();
-      const r = Math.max((radius * scaleX) - inset, 2);
-      if (ctx.roundRect) {
-        ctx.roundRect(inset, inset, cw - inset * 2, ch - inset * 2, r);
+        ctx.putImageData(imgData, 0, 0);
       } else {
-        ctx.rect(inset, inset, cw - inset * 2, ch - inset * 2);
-      }
-      ctx.fill();
-      ctx.filter = "none";
-    }
+        const cw = canvas.width;
+        const ch = canvas.height;
+        const gx = ctx.createLinearGradient(0, 0, cw, 0);
+        gx.addColorStop(0, "rgb(0,0,0)");
+        gx.addColorStop(1, "rgb(255,0,0)");
+        ctx.fillStyle = gx;
+        ctx.fillRect(0, 0, cw, ch);
 
-    const dataUrl = canvas.toDataURL("image/png");
-    if (mapCache.size > 30) {
-      const firstKey = mapCache.keys().next().value;
-      mapCache.delete(firstKey);
+        const gy = ctx.createLinearGradient(0, 0, 0, ch);
+        gy.addColorStop(0, "rgb(0,0,0)");
+        gy.addColorStop(1, "rgb(0,0,255)");
+        ctx.globalCompositeOperation = "difference";
+        ctx.fillStyle = gy;
+        ctx.fillRect(0, 0, cw, ch);
+
+        ctx.globalCompositeOperation = "source-over";
+        const inset = border * Math.min(cw, ch);
+        ctx.filter = `blur(${mapBlur * scaleX}px)`;
+        ctx.fillStyle = "rgba(128,128,128,0.94)";
+        ctx.beginPath();
+        const r = Math.max((radius * scaleX) - inset, 2);
+        if (ctx.roundRect) {
+          ctx.roundRect(inset, inset, cw - inset * 2, ch - inset * 2, r);
+        } else {
+          ctx.rect(inset, inset, cw - inset * 2, ch - inset * 2);
+        }
+        ctx.fill();
+        ctx.filter = "none";
+      }
+
+      const dataUrl = canvas.toDataURL("image/png");
+      if (mapCache.size > 30) {
+        const firstKey = mapCache.keys().next().value;
+        mapCache.delete(firstKey);
+      }
+      mapCache.set(key, dataUrl);
+      return dataUrl;
+    } catch (_) {
+      return "";
     }
-    mapCache.set(key, dataUrl);
-    return dataUrl;
   }
 
   buildFilter(id, scales) {
-    const filter = document.createElementNS(SVG_NS, "filter");
-    filter.setAttribute("id", id);
-    filter.setAttribute("x", "-10%");
-    filter.setAttribute("y", "-10%");
-    filter.setAttribute("width", "120%");
-    filter.setAttribute("height", "120%");
-    filter.setAttribute("color-interpolation-filters", "sRGB");
+    try {
+      const defs = this.getDefs();
+      if (!defs) return null;
 
-    const feImage = document.createElementNS(SVG_NS, "feImage");
-    feImage.setAttribute("result", "map");
-    feImage.setAttribute("preserveAspectRatio", "none");
-    filter.appendChild(feImage);
+      const filter = document.createElementNS(SVG_NS, "filter");
+      filter.setAttribute("id", id);
+      filter.setAttribute("x", "-10%");
+      filter.setAttribute("y", "-10%");
+      filter.setAttribute("width", "120%");
+      filter.setAttribute("height", "120%");
+      filter.setAttribute("color-interpolation-filters", "sRGB");
 
-    const keep = [
-      "1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0",
-      "0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0",
-      "0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0",
-    ];
-    const channels = [];
-    for (let i = 0; i < 3; i++) {
-      const disp = document.createElementNS(SVG_NS, "feDisplacementMap");
-      disp.setAttribute("in", "SourceGraphic");
-      disp.setAttribute("in2", "map");
-      disp.setAttribute("scale", scales[i]);
-      disp.setAttribute("xChannelSelector", "R");
-      disp.setAttribute("yChannelSelector", "B");
-      disp.setAttribute("result", `d${i}`);
-      filter.appendChild(disp);
+      const feImage = document.createElementNS(SVG_NS, "feImage");
+      feImage.setAttribute("result", "map");
+      feImage.setAttribute("preserveAspectRatio", "none");
+      filter.appendChild(feImage);
 
-      const cm = document.createElementNS(SVG_NS, "feColorMatrix");
-      cm.setAttribute("in", `d${i}`);
-      cm.setAttribute("type", "matrix");
-      cm.setAttribute("values", keep[i]);
-      cm.setAttribute("result", `c${i}`);
-      filter.appendChild(cm);
-      channels.push(`c${i}`);
+      const keep = [
+        "1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0",
+        "0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0",
+        "0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0",
+      ];
+      const channels = [];
+      for (let i = 0; i < 3; i++) {
+        const disp = document.createElementNS(SVG_NS, "feDisplacementMap");
+        disp.setAttribute("in", "SourceGraphic");
+        disp.setAttribute("in2", "map");
+        disp.setAttribute("scale", scales[i]);
+        disp.setAttribute("xChannelSelector", "R");
+        disp.setAttribute("yChannelSelector", "B");
+        disp.setAttribute("result", `d${i}`);
+        filter.appendChild(disp);
+
+        const cm = document.createElementNS(SVG_NS, "feColorMatrix");
+        cm.setAttribute("in", `d${i}`);
+        cm.setAttribute("type", "matrix");
+        cm.setAttribute("values", keep[i]);
+        cm.setAttribute("result", `c${i}`);
+        filter.appendChild(cm);
+        channels.push(`c${i}`);
+      }
+
+      const blend1 = document.createElementNS(SVG_NS, "feBlend");
+      blend1.setAttribute("in", channels[0]);
+      blend1.setAttribute("in2", channels[1]);
+      blend1.setAttribute("mode", "screen");
+      blend1.setAttribute("result", "c01");
+      filter.appendChild(blend1);
+
+      const blend2 = document.createElementNS(SVG_NS, "feBlend");
+      blend2.setAttribute("in", "c01");
+      blend2.setAttribute("in2", channels[2]);
+      blend2.setAttribute("mode", "screen");
+      filter.appendChild(blend2);
+
+      defs.appendChild(filter);
+      return { filter, feImage };
+    } catch (_) {
+      return null;
     }
-
-    const blend1 = document.createElementNS(SVG_NS, "feBlend");
-    blend1.setAttribute("in", channels[0]);
-    blend1.setAttribute("in2", channels[1]);
-    blend1.setAttribute("mode", "screen");
-    blend1.setAttribute("result", "c01");
-    filter.appendChild(blend1);
-
-    const blend2 = document.createElementNS(SVG_NS, "feBlend");
-    blend2.setAttribute("in", "c01");
-    blend2.setAttribute("in2", channels[2]);
-    blend2.setAttribute("mode", "screen");
-    filter.appendChild(blend2);
-
-    this.getDefs().appendChild(filter);
-    return { filter, feImage };
   }
 
   apply(el, options = {}) {
@@ -213,45 +226,69 @@ export class LiquidEngine {
 
     // Determine mode accurately
     const isLite = (this.mode === 'lite');
-    const isUltra = (!isLite && this.mode === 'ultra' && this.isSupported);
-    const isBalanced = (!isLite && !isUltra);
+    let isUltra = (!isLite && this.mode === 'ultra' && this.isSupported);
 
     let parts = null;
     let filterId = null;
 
     if (isUltra) {
-      filterId = `liqu-filter-${++uid}`;
-      const scales = [opts.scale, opts.scale + opts.chroma, opts.scale + 2 * opts.chroma];
-      parts = this.buildFilter(filterId, scales);
+      try {
+        filterId = `liqu-filter-${++uid}`;
+        const scales = [opts.scale, opts.scale + opts.chroma, opts.scale + 2 * opts.chroma];
+        parts = this.buildFilter(filterId, scales);
+        if (!parts) {
+          isUltra = false;
+        }
+      } catch (_) {
+        isUltra = false;
+      }
     }
 
-    const refresh = () => {
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
-      if (!w || !h) return;
+    const applyFallback = () => {
+      try {
+        el.style.backdropFilter = `blur(${opts.fallbackBlur}px) saturate(${opts.saturate})`;
+        el.style.webkitBackdropFilter = `blur(${opts.fallbackBlur}px) saturate(${opts.saturate})`;
+      } catch (_) {}
+    };
 
-      if (isUltra && parts) {
-        const computedRadius = opts.radius != null ? opts.radius : (Math.min(w, h) / 2);
-        const mapUrl = this.getMap(w, h, computedRadius, opts.border, opts.mapBlur, opts.isOrb);
-        parts.feImage.setAttribute("href", mapUrl);
-        parts.feImage.setAttribute("width", w);
-        parts.feImage.setAttribute("height", h);
+    const refresh = () => {
+      try {
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        if (!w || !h) return;
+
+        if (isUltra && parts && parts.feImage) {
+          const computedRadius = opts.radius != null ? opts.radius : (Math.min(w, h) / 2);
+          const mapUrl = this.getMap(w, h, computedRadius, opts.border, opts.mapBlur, opts.isOrb);
+          if (mapUrl) {
+            parts.feImage.setAttribute("href", mapUrl);
+            parts.feImage.setAttribute("width", w);
+            parts.feImage.setAttribute("height", h);
+          } else {
+            applyFallback();
+          }
+        }
+      } catch (_) {
+        applyFallback();
       }
     };
 
     // Clean any previous mode classes
     el.classList.remove("liqu-glass-lite");
 
-    if (isLite) {
-      el.style.backdropFilter = `blur(8px)`;
-      el.style.webkitBackdropFilter = `blur(8px)`;
-      el.classList.add("liqu-glass-lite");
-    } else if (isUltra) {
-      el.style.backdropFilter = `url(#${filterId}) blur(${opts.blur}px) saturate(${opts.saturate})`;
-      el.style.webkitBackdropFilter = `url(#${filterId}) blur(${opts.blur}px) saturate(${opts.saturate})`;
-    } else {
-      el.style.backdropFilter = `blur(${opts.fallbackBlur}px) saturate(${opts.saturate})`;
-      el.style.webkitBackdropFilter = `blur(${opts.fallbackBlur}px) saturate(${opts.saturate})`;
+    try {
+      if (isLite) {
+        el.style.backdropFilter = `blur(8px)`;
+        el.style.webkitBackdropFilter = `blur(8px)`;
+        el.classList.add("liqu-glass-lite");
+      } else if (isUltra && filterId) {
+        el.style.backdropFilter = `url(#${filterId}) blur(${opts.blur}px) saturate(${opts.saturate})`;
+        el.style.webkitBackdropFilter = `url(#${filterId}) blur(${opts.blur}px) saturate(${opts.saturate})`;
+      } else {
+        applyFallback();
+      }
+    } catch (_) {
+      applyFallback();
     }
 
     refresh();
