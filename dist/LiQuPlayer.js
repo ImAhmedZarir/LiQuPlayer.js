@@ -978,8 +978,20 @@
       this.scrubProgress = this.bottomDock.querySelector('.liqu-scrub-progress');
       this.scrubBuffer = this.bottomDock.querySelector('.liqu-scrub-buffer');
       this.scrubTooltip = this.bottomDock.querySelector('.liqu-scrub-tooltip');
-
       this.applyLiquidOptics();
+
+      // Automatic Compact / Mobile Responsive Detection
+      this.checkCompactMode = () => {
+        const w = this.container.offsetWidth;
+        const h = this.container.offsetHeight;
+        const isCompact = (w > 0 && w < 680) || (h > 0 && h < 340);
+        this.container.classList.toggle('liqu-compact-mode', isCompact);
+      };
+      this.checkCompactMode();
+      if (typeof ResizeObserver !== 'undefined') {
+        this.compactRo = new ResizeObserver(this.checkCompactMode);
+        this.compactRo.observe(this.container);
+      }
     }
 
     applyLiquidOptics() {
@@ -1427,6 +1439,10 @@
     off(e, fn) { if (this.listeners.has(e)) this.listeners.get(e).delete(fn); }
     emit(e, d) { if (this.listeners.has(e)) this.listeners.get(e).forEach(fn => fn(d)); }
     destroy() {
+      if (this.compactRo) {
+        this.compactRo.disconnect();
+        this.compactRo = null;
+      }
       if (this._glowCleanup) this._glowCleanup();
       this.sourceManager.unload();
       this.liquidEngine.destroy();

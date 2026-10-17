@@ -1,4 +1,4 @@
-# LiQu Player (LiQuPlayer.js) 💧✨
+# LiQu Player (LiQuPlayer.js)
 
 > **The Powerhouse Open-Source Video Player Inspired by Apple-Style Liquid Glass UI.**
 
@@ -12,7 +12,7 @@
 
 ---
 
-## 📸 Showcase & UI Previews
+## Showcase & UI Previews
 
 <div align="center">
   <img src="assets/images/preview-odyssey-ship.png" alt="LiQu Player Cinematic Odyssey Showcase" width="100%" />
@@ -30,7 +30,7 @@
 
 ---
 
-## ✨ Features
+## Features
 
 - **True Optical Rim Refraction**: Uses custom SVG displacement maps and channel differences to genuinely bend and refract the video playing underneath.
 - **Spherical Droplet Lens**: Center play button acts as a real fluid marble, magnifying and distorting the underlying image with chromatic aberration.
@@ -43,7 +43,7 @@
   - Offline Procedural SMPTE Color Bar Generator (`test:colorbar`)
 - **Ultra-Low RAM & Old Device Optimization**:
   - **Ultra Fluid Mode**: Real SVG refraction filter + chromatic fringe + cursor specular tracking.
-  - **Balanced Mode (60 FPS)**: Hardware-accelerated CSS frosted glass (`blur(16px) saturate(1.8)`), butter-smooth on mobile.
+  - **Balanced Mode (60 FPS)**: Hardware-accelerated CSS frosted glass (`blur(16px) saturate(1.8)`), solid 60 FPS on mobile.
   - **Lite Mode**: Hardware-optimized lightweight glass (`blur(8px)` + dark tint) designed for low-end Android devices and older smart TVs.
   - Total JS heap memory consumption is under **15 MB**.
 - **Touch & Gesture Engine**:
@@ -63,7 +63,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Include CSS & JS
 
@@ -102,7 +102,7 @@
 
 ---
 
-## 🛠️ Configuration Options
+## Configuration Options
 
 | Option | Type | Default | Description |
 |---|---|---|---|
@@ -120,7 +120,7 @@
 
 ---
 
-## 📖 Public API Methods
+## Public API Methods
 
 ```javascript
 // Playback Controls
@@ -156,15 +156,15 @@ player.destroy();
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Key | Action |
 |---|---|
 | `Space` or `k` | Toggle Play / Pause |
-| `←` or `j` | Seek Backward 10 Seconds |
-| `→` or `l` | Seek Forward 10 Seconds |
-| `↑` | Increase Volume (+5%) |
-| `↓` | Decrease Volume (-5%) |
+| `Left Arrow` or `j` | Seek Backward 10 Seconds |
+| `Right Arrow` or `l` | Seek Forward 10 Seconds |
+| `Up Arrow` | Increase Volume (+5%) |
+| `Down Arrow` | Decrease Volume (-5%) |
 | `m` | Toggle Mute |
 | `f` | Toggle Fullscreen |
 | `p` | Toggle Picture-in-Picture |
@@ -172,7 +172,7 @@ player.destroy();
 
 ---
 
-## 📱 Mobile Gestures
+## Mobile Gestures
 
 - **Double-Tap Left**: Seek -10s with liquid ripple.
 - **Double-Tap Right**: Seek +10s with liquid ripple.
@@ -183,7 +183,7 @@ player.destroy();
 
 ---
 
-## 🌐 Supported Streaming Formats
+## Supported Streaming Formats
 
 | Format | Extensions / Protocols | Engine |
 |---|---|---|
@@ -196,7 +196,7 @@ player.destroy();
 
 ---
 
-## 💡 How Liquid Refraction Works
+## How Liquid Refraction Works
 
 1. **Displacement Mapping**: A canvas buffer renders an $(x, y)$ displacement map where Red encodes horizontal refraction and Blue encodes vertical refraction. An inset rounded rect or sphere filled with neutral 50% gray restricts bending precisely to the outer perimeter rim.
 2. **Chromatic Aberration**: The displacement map is evaluated across three channels at staggered optical strengths, recombined through SVG `feColorMatrix` and `feBlend mode="screen"`.
@@ -205,7 +205,7 @@ player.destroy();
 
 ---
 
-## 📄 License
+## License
 
 LiQu Player is open-source software licensed under the [MIT License](LICENSE).
-Created with passion by [Ahmed Zarir](https://github.com/ImAhmedZarir).
+Created by [Ahmed Zarir](https://github.com/ImAhmedZarir).

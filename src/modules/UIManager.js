@@ -183,6 +183,19 @@ export class UIManager {
 
     // Apply liquid glass engine to all glass elements
     this.applyLiquidMaterials();
+
+    // Automatic Compact / Mobile Responsive Detection
+    this.checkCompactMode = () => {
+      const w = this.container.offsetWidth;
+      const h = this.container.offsetHeight;
+      const isCompact = (w > 0 && w < 680) || (h > 0 && h < 340);
+      this.container.classList.toggle('liqu-compact-mode', isCompact);
+    };
+    this.checkCompactMode();
+    if (typeof ResizeObserver !== 'undefined') {
+      this.compactRo = new ResizeObserver(this.checkCompactMode);
+      this.compactRo.observe(this.container);
+    }
   }
 
   applyLiquidMaterials() {
@@ -566,6 +579,10 @@ export class UIManager {
   }
 
   destroy() {
+    if (this.compactRo) {
+      this.compactRo.disconnect();
+      this.compactRo = null;
+    }
     this.closeMenu();
     this.container.innerHTML = '';
   }
